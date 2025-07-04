@@ -1,0 +1,41 @@
+name: Deploy Firebase Functions - Recomendações
+
+on:
+  push:
+    branches:
+      - main # Dispara o workflow em push para a branch 'main'
+    paths:
+      - 'functions/**' # Apenas se houver mudanças no diretório das funções
+      - 'firebase.json' # Se houver mudanças na configuração do Firebase
+      - '.github/workflows/firebase-functions.yml' # Se houver mudanças na configuração do workflow
+  workflow_dispatch: # Permite disparar manualmente o workflow
+
+jobs:
+  deploy-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22' # Deve corresponder à versão definida em functions/package.json
+
+      - name: Instalar Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Instalar Dependências das Funções
+        run: npm install
+        working-directory: ./functions # Instala as dependências dentro do diretório 'functions'
+
+      - name: Build das Firebase Functions
+        run: npm run build
+        working-directory: ./functions # Compila o TypeScript
+
+      - name: Deploy das Firebase Functions
+        run: |
+          echo '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}' > gcp-credentials.json
+          firebase deploy --only functions --project ${{ secrets.GCP_PROJECT_ID }} --non-interactive --force
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: gcp-credentials.json
