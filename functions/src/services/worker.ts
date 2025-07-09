@@ -195,7 +195,10 @@ function calcularScoreRecomendacao(
   }
 
   // Ajuste baseado no valor mínimo vs patrimônio do cliente
-  const proporcaoAplicacao = produto.aplicacao_minima / cliente.patrimonio_total_estimado;
+  let proporcaoAplicacao = 0;
+  if (cliente.patrimonio_total_estimado > 0) {
+    proporcaoAplicacao = produto.aplicacao_minima / cliente.patrimonio_total_estimado;
+  }
   if (proporcaoAplicacao < 0.05) { // Menos de 5% do patrimônio
     score += 0.1;
   }
