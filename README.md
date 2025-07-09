@@ -18,7 +18,7 @@ npm run build
 npm run build:watch
 ```
 
-4. Para servir localmente:
+4. Para servir localmente, usando emuladores:
 ```bash
 npm run serve
 ```
