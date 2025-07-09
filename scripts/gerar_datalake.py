@@ -2,7 +2,7 @@ import pandas as pd
 from faker import Faker
 import random
 from datetime import datetime, timedelta
-import os # Importa o módulo os para interações com o sistema de arquivos
+import os # Importa o módulo os para interações com o sistema operacional
 
 fake = Faker('pt_BR') # Para dados em português do Brasil
 
