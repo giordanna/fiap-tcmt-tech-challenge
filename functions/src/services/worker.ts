@@ -243,8 +243,15 @@ function calcularScoreRecomendacao(
 function gerarMotivoRecomendacao(cliente: Cliente, produto: Produto): string {
   const motivos = [];
 
-  if (cliente.perfil_risco.toLowerCase() === produto.risco_associado.toLowerCase()) {
-    motivos.push(`Compatível com seu perfil ${cliente.perfil_risco.toLowerCase()}`);
+  const riskProfileMapping: { [key: string]: string } = {
+    'conservador': 'baixo',
+    'moderado': 'médio',
+    'arrojado': 'alto'
+  };
+
+  const clienteRiscoMapeado = riskProfileMapping[cliente.perfil_risco.toLowerCase()];
+  if (clienteRiscoMapeado === produto.risco_associado.toLowerCase()) {
+    motivos.push(`Compatível com seu perfil ${cliente.perfil_risco}`);
   }
 
   if (produto.rentabilidade_historica_12m > 0.1) {
