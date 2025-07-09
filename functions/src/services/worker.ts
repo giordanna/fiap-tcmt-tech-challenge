@@ -30,22 +30,19 @@ async function lerCSVDoStorage(fileName: string): Promise<any[]> {
     const [buffer] = await file.download();
     const csvString = buffer.toString('utf8');
     
-    return new Promise((resolve, reject) => {
-      const results: any[] = [];
-      const stream = Readable.from(csvString);
-      
-      stream
-        .pipe(csv())
-        .on('data', (data: any) => {
-          results.push(data);
-        })
-        .on('end', () => {
-          resolve(results);
-        })
-        .on('error', (error: any) => {
-          reject(error);
-        });
-    });
+    const results: any[] = [];
+    const stream = Readable.from(csvString).pipe(csv());
+    
+    try {
+      for await (const data of stream) {
+        results.push(data);
+      }
+    } catch (error) {
+      logger.error(`Erro ao processar o stream do CSV ${fileName}:`, error);
+      return [];
+    }
+    
+    return results;
   } catch (error) {
     logger.error(`Erro ao ler CSV ${fileName}:`, error);
     return [];
