@@ -147,7 +147,7 @@ print("Interações geradas.")
 dados_mercado_data = []
 # Ajustei a data de início para um período mais compatível com "agora",
 # dado que a data atual é 09/07/2025.
-start_date_mercado = datetime(2020, 1, 1) # Últimos ~5 anos a partir de 2025
+start_date_mercado = datetime.now() - timedelta(days=5*365) # Últimos ~5 anos a partir de hoje
 end_date_mercado = datetime.now() 
 
 current_date = start_date_mercado
