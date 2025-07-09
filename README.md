@@ -1,6 +1,6 @@
-# Tech Challenge POC
+# Tech Challenge POC: Módulo de recomendações
 
-## Instruções:
+## Instruções das Functions:
 
 1. Instale as dependências:
 ```bash
@@ -18,7 +18,39 @@ npm run build
 npm run build:watch
 ```
 
-4. Para servir localmente:
+4. Para servir localmente, usando emuladores:
 ```bash
 npm run serve
+```
+
+5. Para realizar o deploy manualmente:
+```bash
+npm run deploy
+```
+
+## Instruções da geração do datalake
+
+1. Crie um ambiente virtual:
+```bash
+cd scripts
+python -m venv venv
+```
+
+2. Ative o ambiente virtual (opcional):
+```bash
+# windows
+.\venv\Scripts\activate
+
+# linux/mac
+source venv/bin/activate
+```
+
+3. Instale as dependências:
+```bash
+pip install -r requirements.txt
+```
+
+4. Execute o script
+```bash
+python gerar_datalake.py
 ```

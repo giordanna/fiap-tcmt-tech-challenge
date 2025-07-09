@@ -6,6 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 firebase-debug.log*
 firebase-debug.*.log*
+*.log
 
 # Firebase cache
 .firebase/
@@ -70,3 +71,9 @@ node_modules/
 
 *.local
 lib/
+
+# Ambiente Virtual
+venv/
+
+# Dados gerados
+datalake_poc/

@@ -24,6 +24,12 @@
     },
     "ui": {
       "port": 4000
+    },
+    "storage": {
+      "port": 9199
     }
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }
