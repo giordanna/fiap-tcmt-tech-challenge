@@ -18,25 +18,30 @@ app.get("/recomendacoes/:usuarioId", async (req, res) => {
   try {
     const bd = admin.firestore();
 
-    const refDocumento = bd.collection("recomendacoes_por_usuario").doc(usuarioId);
+    const refDocumento = bd
+      .collection("recomendacoes_por_usuario")
+      .doc(usuarioId);
     const documento = await refDocumento.get();
 
-    if (documento.exists && documento.data() && (documento.data() as DocumentoRecomendacao).recomendacoes) {
+    if (
+      documento.exists &&
+      documento.data() &&
+      (documento.data() as DocumentoRecomendacao).recomendacoes
+    ) {
       const dados = documento.data() as DocumentoRecomendacao;
-      return res.json({ id_usuario: usuarioId, recomendacoes: dados.recomendacoes });
+      return res.json(dados);
     } else {
-      // Se não encontrar para o usuário específico, tenta o padrão
-      const documentoPadrao = await bd.collection("recomendacoes_por_usuario").doc("usuario_padrao").get();
-      if (documentoPadrao.exists && documentoPadrao.data() && (documentoPadrao.data() as DocumentoRecomendacao).recomendacoes) {
-        const dados = documentoPadrao.data() as DocumentoRecomendacao;
-        return res.json({ id_usuario: usuarioId, recomendacoes: dados.recomendacoes });
-      } else {
-        return res.status(404).json({ mensagem: "Nenhuma recomendação encontrada para este usuário ou padrão." });
-      }
+      return res
+        .status(404)
+        .json({
+          mensagem: "Nenhuma recomendação encontrada para este usuário.",
+        });
     }
   } catch (erro) {
     logger.error("Erro ao buscar recomendações:", erro);
-    return res.status(500).json({ mensagem: "Erro interno ao buscar recomendações." });
+    return res
+      .status(500)
+      .json({ mensagem: "Erro interno ao buscar recomendações." });
   }
 });
 
@@ -45,6 +50,13 @@ app.get("/healthcheck", (_, res) => {
    * Endpoint de verificação de saúde para verificar se o serviço está ativo.
    */
   res.json({ status: "OK", servico: "api-recomendacoes" });
+});
+
+app.use((_, res) => {
+  /**
+   * Middleware para lidar com rotas não encontradas.
+   */
+  res.status(405).json({ mensagem: "Método não permitido ou rota não encontrada." });
 });
 
 export { app };
