@@ -30,7 +30,7 @@ npm run deploy
 
 ## Instruções da geração do datalake
 
-1. Crie um amviente virtual:
+1. Crie um ambiente virtual:
 ```bash
 cd scripts
 python -m venv venv
