@@ -3,7 +3,6 @@ package dominio
 // entidades de dominio que espelham o banco
 type Cliente struct {
 	ID          string  `json:"id_cliente"`
-	Nome        string  `json:"nome_cliente"`
 	PerfilRisco string  `json:"perfil_risco"`
 	Patrimonio  float64 `json:"patrimonio_total_estimado"`
 }
@@ -36,4 +35,10 @@ type RepositorioDados interface {
 	VerificarPosseProduto(clienteID, produtoID string) (bool, error)
 	VerificarInteracaoRecente(clienteID, produtoID string) (bool, error)
 	SalvarRecomendacao(clienteID string, itens []RecomendacaoItem) (string, error)
+	BuscarUltimaRecomendacao(clienteID string) (*ResultadoRecomendacao, error)
+	ListarTodosClientes() ([]Cliente, error)
+}
+
+type Publicador interface {
+	Publicar(topico string, payload interface{})
 }

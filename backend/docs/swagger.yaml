@@ -1,0 +1,139 @@
+basePath: /
+definitions:
+  dominio.Produto:
+    properties:
+      aplicacao_minima:
+        type: number
+      id_produto:
+        type: string
+      nome_produto:
+        type: string
+      rentabilidade_12m:
+        type: number
+      risco_associado:
+        type: string
+    type: object
+  dominio.RecomendacaoItem:
+    properties:
+      motivo:
+        type: string
+      pontuacao:
+        type: number
+      produto:
+        $ref: '#/definitions/dominio.Produto'
+    type: object
+  dominio.ResultadoRecomendacao:
+    properties:
+      id_cliente:
+        type: string
+      id_recomendacao:
+        description: uuid gerado
+        type: string
+      recomendacoes:
+        items:
+          $ref: '#/definitions/dominio.RecomendacaoItem'
+        type: array
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Microsserviço de recomendações com estratégia Strangler Fig para legado.
+  title: API de Recomendações
+  version: 1.0.0
+paths:
+  /api/v2/healthcheck:
+    get:
+      description: Retorna status OK se a API estiver no ar
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Verificação de saúde
+      tags:
+      - health
+  /api/v2/recomendacoes:
+    post:
+      consumes:
+      - application/json
+      description: Dispara processo assíncrono para gerar recomendações para todos
+        os clientes
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Gera recomendações em massa
+      tags:
+      - recomendacoes
+  /api/v2/recomendacoes/{clienteId}:
+    get:
+      consumes:
+      - application/json
+      description: Retorna as últimas recomendações geradas para o cliente
+      parameters:
+      - description: ID do Cliente
+        in: path
+        name: clienteId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dominio.ResultadoRecomendacao'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Busca recomendações recentes
+      tags:
+      - recomendacoes
+    post:
+      consumes:
+      - application/json
+      description: Gera e persiste novas recomendações para o cliente informado
+      parameters:
+      - description: ID do Cliente
+        in: path
+        name: clienteId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dominio.ResultadoRecomendacao'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Gera novas recomendações
+      tags:
+      - recomendacoes
+securityDefinitions:
+  BasicAuth:
+    type: basic
+swagger: "2.0"

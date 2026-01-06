@@ -1,29 +1,35 @@
 package casodeuso
 
 import (
+	"log/slog"
 	"sort"
 	"sync"
 
-	"github.com/giordanna/fiap-tcmt-tech-challenge/backend/interno/dominio"
+	"backend/interno/dominio"
 )
 
 type ServicoRecomendacao struct {
-	repo dominio.RepositorioDados
+	repo       dominio.RepositorioDados
+	publicador dominio.Publicador
 }
 
-func NovoServicoRecomendacao(r dominio.RepositorioDados) *ServicoRecomendacao {
-	return &ServicoRecomendacao{repo: r}
+func NovoServicoRecomendacao(r dominio.RepositorioDados, p dominio.Publicador) *ServicoRecomendacao {
+	return &ServicoRecomendacao{repo: r, publicador: p}
 }
 
 // Executar roda a lógica de scoring definida no projeto
 func (s *ServicoRecomendacao) Executar(clienteID string) (*dominio.ResultadoRecomendacao, error) {
+	slog.Info("Iniciando cálculo de recomendação", "cliente_id", clienteID)
+
 	cliente, err := s.repo.ObterCliente(clienteID)
 	if err != nil {
+		slog.Error("Falha ao obter dados do cliente", "erro", err, "cliente_id", clienteID)
 		return nil, err
 	}
 
 	produtos, err := s.repo.ListarProdutosAtivos()
 	if err != nil {
+		slog.Error("Falha ao listar produtos ativos", "erro", err)
 		return nil, err
 	}
 
@@ -116,9 +122,16 @@ func (s *ServicoRecomendacao) Executar(clienteID string) (*dominio.ResultadoReco
 		return recomendacoes[i].Pontuacao > recomendacoes[j].Pontuacao
 	})
 
+	slog.Info("Cálculo finalizado",
+		"cliente_id", clienteID,
+		"total_recomendacoes", len(recomendacoes),
+		"produtos_analisados", len(produtos),
+	)
+
 	// persiste no banco (auditoria) e recupera uuid
 	uuid, err := s.repo.SalvarRecomendacao(clienteID, recomendacoes)
 	if err != nil {
+		slog.Error("Erro ao salvar recomendação no banco (auditoria)", "erro", err, "cliente_id", clienteID)
 		return nil, err
 	}
 
@@ -127,4 +140,28 @@ func (s *ServicoRecomendacao) Executar(clienteID string) (*dominio.ResultadoReco
 		ClienteID:     cliente.ID,
 		Recomendacoes: recomendacoes,
 	}, nil
+}
+
+// BuscarUltima recupera a última recomendação gerada para o cliente
+func (s *ServicoRecomendacao) BuscarUltima(clienteID string) (*dominio.ResultadoRecomendacao, error) {
+	return s.repo.BuscarUltimaRecomendacao(clienteID)
+}
+
+// GerarEmMassa dispara o processo de recomendação para todos os clientes de forma assíncrona
+func (s *ServicoRecomendacao) GerarEmMassa() error {
+	clientes, err := s.repo.ListarTodosClientes()
+	if err != nil {
+		slog.Error("Erro ao listar clientes para geração em massa", "erro", err)
+		return err
+	}
+
+	slog.Info("Iniciando geração em massa de recomendações", "total_clientes", len(clientes))
+
+	for _, cliente := range clientes {
+		// Publica evento para cada cliente
+		// O tópico deve coincidir com o que o worker escuta: "gerar-recomendacao"
+		s.publicador.Publicar("gerar-recomendacao", cliente.ID)
+	}
+
+	return nil
 }

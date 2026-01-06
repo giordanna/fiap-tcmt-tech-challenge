@@ -9,7 +9,7 @@ RUN go mod download
 
 # compilação estática
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o api-gateway ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o api-gateway ./main.go
 
 # estágio final (imagem leve)
 FROM alpine:latest

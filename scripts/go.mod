@@ -1,4 +1,4 @@
-module github.com/giordanna/fiap-tcmt-tech-challenge/scripts
+module scripts
 
 go 1.21
 

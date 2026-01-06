@@ -45,7 +45,7 @@ func main() {
 	log.Println("✓ Conectado ao banco de dados")
 
 	// Diretório dos CSVs (projeto original)
-	csvDir := "../fiap-tcmt-tech-challenge-main/scripts"
+	csvDir := "./datalake"
 
 	// Importa cada arquivo CSV
 	if err := importarClientes(db, filepath.Join(csvDir, "clientes.csv")); err != nil {
@@ -94,14 +94,13 @@ func importarClientes(db *sql.DB, caminho string) error {
 			continue
 		}
 
-		// id_cliente, nome_cliente, data_cadastro, idade, genero, renda_mensal_estimada,
-		// patrimonio_total_estimado, perfil_risco, objetivo_investimento, ultima_interacao
-		patrimonio, _ := strconv.ParseFloat(record[6], 64)
+		// id_cliente, patrimonio, perfil_risco, objetivo_investimento
+		patrimonio, _ := strconv.ParseFloat(record[1], 64)
 
-		query := `INSERT INTO clientes (id_cliente, nome_cliente, perfil_risco, patrimonio_total_estimado) 
+		query := `INSERT INTO clientes (id_cliente, patrimonio_total_estimado, perfil_risco, objetivo_investimento) 
 		          VALUES ($1, $2, $3, $4) ON CONFLICT (id_cliente) DO NOTHING`
 
-		_, err = db.Exec(query, record[0], record[1], record[7], patrimonio)
+		_, err = db.Exec(query, record[0], patrimonio, record[2], record[3])
 		if err != nil {
 			log.Printf("Erro ao inserir cliente %s: %v", record[0], err)
 			continue
@@ -143,12 +142,14 @@ func importarProdutos(db *sql.DB, caminho string) error {
 		// id_produto, nome_produto, tipo_produto, risco_associado, rentabilidade_historica_12m,
 		// rentabilidade_historica_36m, taxa_administracao, aplicacao_minima, liquidez, status_produto
 		rentabilidade12m, _ := strconv.ParseFloat(record[4], 64)
+		rentabilidade36m, _ := strconv.ParseFloat(record[5], 64)
+		taxaAdmin, _ := strconv.ParseFloat(record[6], 64)
 		aplicacaoMinima, _ := strconv.ParseFloat(record[7], 64)
 
-		query := `INSERT INTO produtos (id_produto, nome_produto, risco_associado, rentabilidade_12m, aplicacao_minima, status_produto) 
-		          VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id_produto) DO NOTHING`
+		query := `INSERT INTO produtos (id_produto, nome_produto, tipo_produto, risco_associado, rentabilidade_historica_12m, rentabilidade_historica_36m, taxa_administracao, aplicacao_minima, liquidez, status_produto) 
+		          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (id_produto) DO NOTHING`
 
-		_, err = db.Exec(query, record[0], record[1], record[3], rentabilidade12m, aplicacaoMinima, record[9])
+		_, err = db.Exec(query, record[0], record[1], record[2], record[3], rentabilidade12m, rentabilidade36m, taxaAdmin, aplicacaoMinima, record[8], record[9])
 		if err != nil {
 			log.Printf("Erro ao inserir produto %s: %v", record[0], err)
 			continue
@@ -187,14 +188,13 @@ func importarTransacoes(db *sql.DB, caminho string) error {
 			continue
 		}
 
-		// id_transacao, id_cliente, id_produto, tipo_transacao, valor_transacao,
-		// data_transacao, status_transacao
+		// id_transacao, id_cliente, id_produto, tipo_transacao, valor_transacao, data_transacao, status_transacao
 		valorTransacao, _ := strconv.ParseFloat(record[4], 64)
 
-		query := `INSERT INTO transacoes (id_transacao, id_cliente, id_produto, tipo_transacao, valor_transacao, data_transacao) 
-		          VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id_transacao) DO NOTHING`
+		query := `INSERT INTO transacoes (id_transacao, id_cliente, id_produto, tipo_transacao, valor_transacao, data_transacao, status_transacao) 
+		          VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id_transacao) DO NOTHING`
 
-		_, err = db.Exec(query, record[0], record[1], record[2], record[3], valorTransacao, record[5])
+		_, err = db.Exec(query, record[0], record[1], record[2], record[3], valorTransacao, record[5], record[6])
 		if err != nil {
 			log.Printf("Erro ao inserir transação %s: %v", record[0], err)
 			continue
@@ -234,10 +234,12 @@ func importarInteracoes(db *sql.DB, caminho string) error {
 		}
 
 		// id_interacao, id_cliente, id_produto, tipo_interacao, data_interacao, duracao_interacao_segundos
-		query := `INSERT INTO interacoes (id_interacao, id_cliente, id_produto, tipo_interacao, data_interacao) 
-		          VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id_interacao) DO NOTHING`
+		duracao, _ := strconv.Atoi(record[5])
 
-		_, err = db.Exec(query, record[0], record[1], record[2], record[3], record[4])
+		query := `INSERT INTO interacoes (id_interacao, id_cliente, id_produto, tipo_interacao, data_interacao, duracao_interacao_segundos) 
+		          VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id_interacao) DO NOTHING`
+
+		_, err = db.Exec(query, record[0], record[1], record[2], record[3], record[4], duracao)
 		if err != nil {
 			log.Printf("Erro ao inserir interação %s: %v", record[0], err)
 			continue

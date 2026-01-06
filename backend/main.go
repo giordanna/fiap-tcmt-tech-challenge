@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -15,12 +17,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
-	casodeuso "github.com/giordanna/fiap-tcmt-tech-challenge/backend/interno/casos_de_uso"
-	"github.com/giordanna/fiap-tcmt-tech-challenge/backend/interno/handlers"
-	"github.com/giordanna/fiap-tcmt-tech-challenge/backend/interno/repositorio"
-	"github.com/giordanna/fiap-tcmt-tech-challenge/backend/pkg/logger"
+	_ "backend/docs"
+
+	"backend/interno/casodeuso"
+	"backend/interno/controladores"
+	"backend/interno/infraestrutura/logger"
+	"backend/interno/infraestrutura/pubsub"
+	"backend/interno/infraestrutura/repositorio"
+	"backend/interno/infraestrutura/worker"
 )
+
+// @title           API de Recomendações
+// @version         1.0.0
+// @description     Microsserviço de recomendações com estratégia Strangler Fig para legado.
+
+// @host      localhost:8080
+// @BasePath  /
+
+// @securityDefinitions.basic BasicAuth
 
 func main() {
 	// Inicializa logger estruturado
@@ -75,9 +92,29 @@ func main() {
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	// Injeção de dependências (DI)
+	// Inicializa EventBus (Pub/Sub)
+	gcpProjectID := getEnv("GCP_PROJECT_ID", "")
+	if gcpProjectID == "" {
+		slog.Error("GCP_PROJECT_ID não configurado")
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+	bus, err := pubsub.NovoGCPEventBus(ctx, gcpProjectID)
+	if err != nil {
+		slog.Error("Erro ao inicializar GCP Pub/Sub", "erro", err)
+		os.Exit(1)
+	}
+	defer bus.Close()
+
+	// Inicializa repositório e serviços
 	repo := repositorio.NovoRepositorioPostgres(db)
-	servico := casodeuso.NovoServicoRecomendacao(repo)
-	handler := handlers.NovoHandlerRecomendacoes(servico)
+	servico := casodeuso.NovoServicoRecomendacao(repo, bus)
+	handler := controladores.NovoControladorRecomendacoes(servico)
+
+	// Inicializa Worker de Recomendação
+	workerRecom := worker.NovoWorkerRecomendacao(servico, bus)
+	workerRecom.Iniciar()
 
 	// Configuração do Gin
 	gin.SetMode(gin.ReleaseMode)
@@ -87,10 +124,40 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(loggerMiddleware())
 
+	// Grupo de API nova de microsserviços
+	v2 := router.Group("/api/v2")
+
 	// Rotas
-	router.GET("/healthcheck", handler.HealthCheck)
-	router.GET("/recomendacoes/:clienteId", handler.BuscarRecomendacoes)
-	router.POST("/recomendacoes/:clienteId", handler.GerarRecomendacoes)
+	v2.GET("/healthcheck", handler.HealthCheck)
+	v2.GET("/recomendacoes/:clienteId", handler.BuscarRecomendacoes)
+	v2.POST("/recomendacoes/:clienteId", handler.GerarRecomendacoes)
+	v2.POST("/recomendacoes", handler.GerarRecomendacoesMassiva)
+
+	// Swagger
+	v2.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// Proxy reverso para o legado (Strangler Fig)
+	legacyURL := getEnv("API_LEGADA_BASE_URL", "http://localhost:8081") // URL default do legado
+	target, err := url.Parse(legacyURL)
+	if err != nil {
+		slog.Error("Erro ao fazer parse da URL legado", "erro", err)
+		os.Exit(1)
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Customiza o diretor para garantir que o host esteja correto
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		req.Host = target.Host
+	}
+
+	// Qualquer rota não tratada pelo Gin será encaminhada para o serviço legado
+	router.NoRoute(func(c *gin.Context) {
+		slog.Info("Encaminhando requisição para legado", "path", c.Request.URL.Path, "method", c.Request.Method)
+		proxy.ServeHTTP(c.Writer, c.Request)
+	})
 
 	// Configuração do servidor HTTP
 	srv := &http.Server{
