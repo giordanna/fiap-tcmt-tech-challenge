@@ -1,0 +1,51 @@
+services:
+  # Banco de dados PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: tech-challenge-postgres
+    environment:
+      POSTGRES_USER: fiap
+      POSTGRES_PASSWORD: fiap123
+      POSTGRES_DB: tech_challenge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fiap -d tech_challenge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tech-challenge-network
+
+  # API Backend em Golang
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tech-challenge-backend
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: fiap
+      DB_PASSWORD: fiap123
+      DB_NAME: tech_challenge
+      API_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tech-challenge-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  tech-challenge-network:
+    driver: bridge

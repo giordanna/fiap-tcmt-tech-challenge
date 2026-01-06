@@ -1,56 +1,408 @@
-# Tech Challenge POC: Módulo de recomendações
+# Tech Challenge - Fase 4
+## Sistema de Recomendações de Investimentos
 
-## Instruções das Functions:
+[![Go Version](https://img.shields.io/badge/Go-1.21-blue.svg)](https://golang.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://www.postgresql.org)
+[![GCP](https://img.shields.io/badge/GCP-Cloud%20Run-blue.svg)](https://cloud.google.com/run)
 
-1. Instale as dependências:
-```bash
-cd functions
-npm install
+Sistema de recomendações de investimentos desenvolvido em **Golang** com **PostgreSQL**, evoluído da PoC original em Node.js/Firebase. Deploy automatizado no **Google Cloud Platform** usando **Cloud Run** e **Cloud SQL**.
+
+## 📋 Índice
+
+- [Arquitetura GCP](#arquitetura-gcp)
+- [Diferenças da Versão Node.js](#diferenças-da-versão-nodejs)
+- [Pré-requisitos](#pré-requisitos)
+- [Desenvolvimento Local](#desenvolvimento-local)
+- [Deploy no GCP](#deploy-no-gcp)
+- [API Endpoints](#api-endpoints)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+
+## ☁️ Arquitetura GCP
+
+```
+┌─────────────────────────────────────────────────┐
+│              GitHub Actions (CI/CD)             │
+│  • Build Docker Image                           │
+│  • Push to GCR                                  │
+│  • Deploy to Cloud Run                          │
+└────────────────┬────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────┐
+│           Cloud Run (Serverless)                │
+│  • Container: Golang API                        │
+│  • Auto-scaling                                 │
+│  • HTTPS automático                             │
+└────────────────┬────────────────────────────────┘
+                 │ Unix Socket
+┌────────────────▼────────────────────────────────┐
+│        Cloud SQL (PostgreSQL 15)                │
+│  • Managed database                             │
+│  • Backups automáticos                          │
+│  • Região: southamerica-east1 (São Paulo)       │
+└─────────────────────────────────────────────────┘
 ```
 
-2. Compile o código TypeScript:
+### Componentes GCP
+
+- **Cloud Run**: Hospeda a aplicação Golang em containers serverless
+- **Cloud SQL**: PostgreSQL 15 gerenciado
+- **Secret Manager**: Armazena credenciais sensíveis (senha do banco)
+- **Container Registry (GCR)**: Armazena imagens Docker
+- **Terraform**: Infraestrutura como código (IaC)
+
+## 🔄 Diferenças da Versão Node.js
+
+| Aspecto | Node.js (Original) | Golang (Nova Versão) |
+|---------|-------------------|----------------------|
+| **Runtime** | Node.js 22 | Go 1.21 |
+| **Framework** | Firebase Functions + Express | Gin (HTTP Router) |
+| **Banco de Dados** | Firestore (NoSQL) | Cloud SQL PostgreSQL |
+| **Deploy** | Firebase CLI | GitHub Actions + Terraform |
+| **Processamento** | Pub/Sub Workers | Goroutines (concorrência nativa) |
+| **Infraestrutura** | Serverless (Firebase) | Serverless (Cloud Run) |
+| **IaC** | Nenhum | Terraform |
+
+### Vantagens da Nova Versão
+
+✅ **Performance**: Go compilado é mais rápido que Node.js interpretado  
+✅ **Concorrência**: Goroutines nativas para processamento paralelo  
+✅ **SQL**: PostgreSQL com queries otimizadas e transações ACID  
+✅ **IaC**: Terraform para versionamento de infraestrutura  
+✅ **CI/CD**: Deploy automatizado via GitHub Actions  
+✅ **Custos**: Cloud Run cobra apenas pelo uso real (pay-per-request)  
+
+## 🛠️ Pré-requisitos
+
+### Para Desenvolvimento Local
+
+- **Docker** e **Docker Compose** (para banco local)
+- **Go 1.21+** (para compilar o código)
+- **Make** (opcional, mas recomendado)
+
+### Para Deploy no GCP
+
+- **Conta GCP** com billing ativado
+- **Projeto GCP** criado
+- **GitHub Repository** com secrets configurados
+- **Terraform** instalado (para provisionamento de infraestrutura)
+
+## 💻 Desenvolvimento Local
+
+### 1. Configurar Ambiente
+
 ```bash
-npm run build
+# Copiar template de variáveis
+cp .env.example .env
+
+# Gerar dependências Go
+cd backend
+go mod tidy
 ```
 
-3. Para desenvolvimento com reload automático:
+### 2. Subir Banco de Dados Local
+
 ```bash
-npm run build:watch
+# Subir apenas o PostgreSQL
+docker-compose up -d postgres
+
+# Verificar se está rodando
+docker-compose ps
 ```
 
-4. Para servir localmente, usando emuladores:
+### 3. Executar Migrações
+
 ```bash
-npm run serve
+# Executar SQL de criação de tabelas
+docker-compose exec postgres psql -U fiap -d tech_challenge -f /docker-entrypoint-initdb.d/001_schema_inicial.up.sql
 ```
 
-5. Para realizar o deploy manualmente:
-```bash
-npm run deploy
-```
+### 4. Importar Dados CSV (Opcional)
 
-## Instruções da geração do datalake
-
-1. Crie um ambiente virtual:
 ```bash
 cd scripts
-python -m venv venv
+go run import_csv.go
 ```
 
-2. Ative o ambiente virtual (opcional):
+### 5. Executar Aplicação
+
 ```bash
-# windows
-.\venv\Scripts\activate
-
-# linux/mac
-source venv/bin/activate
+cd backend
+go run cmd/main.go
 ```
 
-3. Instale as dependências:
+A API estará disponível em `http://localhost:8080`
+
+### Comandos Úteis (Makefile)
+
 ```bash
-pip install -r requirements.txt
+make help      # Ver todos os comandos
+make up        # Subir containers
+make logs      # Ver logs
+make down      # Parar containers
+make seed      # Importar dados CSV
 ```
 
-4. Execute o script
+## 🚀 Deploy no GCP
+
+### 1. Configurar Secrets no GitHub
+
+No seu repositório GitHub, vá em **Settings → Secrets and variables → Actions** e adicione:
+
+| Secret | Descrição | Exemplo |
+|--------|-----------|---------|
+| `GOOGLE_CREDENTIALS` | JSON da service account | `{"type": "service_account", ...}` |
+| `GCP_PROJECT` | ID do projeto GCP | `my-project-123456` |
+| `DB_PASSWORD` | Senha do PostgreSQL | `SenhaSegura123!` |
+
+### 2. Provisionar Infraestrutura (Terraform)
+
 ```bash
-python gerar_datalake.py
+# Ir para o diretório de infraestrutura
+cd infra
+
+# Inicializar Terraform
+terraform init
+
+# Ver o plano de execução
+terraform plan \
+  -var="gcp_project_id=SEU_PROJECT_ID" \
+  -var="db_password=SUA_SENHA"
+
+# Aplicar (criar recursos)
+terraform apply \
+  -var="gcp_project_id=SEU_PROJECT_ID" \
+  -var="db_password=SUA_SENHA"
 ```
+
+**Ou via GitHub Actions:**
+
+1. Vá em **Actions** no GitHub
+2. Execute o workflow **"Provisionar Infraestrutura (Terraform)"**
+3. Escolha `apply` quando solicitado
+
+### 3. Deploy Automático
+
+O deploy é **automático** ao fazer push para `main` ou `dev`:
+
+```bash
+git add .
+git commit -m "feat: nova funcionalidade"
+git push origin main
+```
+
+O GitHub Actions irá:
+1. ✅ Build da imagem Docker
+2. ✅ Push para GCR
+3. ✅ Deploy no Cloud Run
+4. ✅ Verificar healthcheck
+
+### 4. Acessar Aplicação
+
+Após o deploy, a URL será exibida nos logs do GitHub Actions:
+
+```
+Service URL: https://app-recomendacao-prod-xxxxx-rj.a.run.app
+```
+
+Ou via CLI:
+
+```bash
+gcloud run services describe app-recomendacao-prod \
+  --region=southamerica-east1 \
+  --format='value(status.url)'
+```
+
+## 📡 API Endpoints
+
+### Health Check
+
+```bash
+GET /healthcheck
+```
+
+**Exemplo:**
+```bash
+curl https://app-recomendacao-prod-xxxxx.a.run.app/healthcheck
+```
+
+**Resposta:**
+```json
+{
+  "status": "OK",
+  "servico": "api-recomendacoes-golang"
+}
+```
+
+### Gerar Recomendações
+
+```bash
+POST /recomendacoes/:clienteId
+```
+
+**Exemplo:**
+```bash
+curl -X POST https://app-recomendacao-prod-xxxxx.a.run.app/recomendacoes/CLI001
+```
+
+**Resposta:**
+```json
+{
+  "id_recomendacao": "550e8400-e29b-41d4-a716-446655440000",
+  "id_cliente": "CLI001",
+  "recomendacoes": [
+    {
+      "produto": {
+        "id_produto": "PROD001",
+        "nome_produto": "CDB Banco XYZ",
+        "risco_associado": "Baixo",
+        "rentabilidade_12m": 12.5,
+        "aplicacao_minima": 1000.0
+      },
+      "pontuacao": 0.75,
+      "motivo": "[perfil compativel] [boa rentabilidade] [acessivel]"
+    }
+  ]
+}
+```
+
+### Buscar Recomendações
+
+```bash
+GET /recomendacoes/:clienteId
+```
+
+**Nota:** Atualmente retorna 404. Implementação futura buscará do banco.
+
+## 📁 Estrutura do Projeto
+
+```
+tech-challenge-fase4/
+├── .github/workflows/          # CI/CD
+│   ├── deploy.yml             # Deploy automático
+│   ├── infra.yml              # Terraform
+│   └── security.yml           # CodeQL scan
+├── backend/                    # Aplicação Golang
+│   ├── cmd/main.go            # Entry point
+│   ├── interno/
+│   │   ├── casos_de_uso/      # Lógica de negócio
+│   │   ├── dominio/           # Entidades
+│   │   ├── handlers/          # HTTP handlers
+│   │   └── repositorio/       # Acesso a dados
+│   ├── pkg/logger/            # Utilitários
+│   ├── Dockerfile             # Container da API
+│   └── go.mod                 # Dependências
+├── infra/
+│   └── main.tf                # Terraform (GCP)
+├── migrations/                 # SQL migrations
+├── scripts/                    # Utilitários
+│   └── import_csv.go          # Importar dados
+├── docker-compose.yml         # Dev local
+├── .env.example               # Config dev
+└── .env.cloudrun.example      # Config GCP (doc)
+```
+
+## 🔧 Configuração de Variáveis
+
+### Desenvolvimento Local (`.env`)
+
+```bash
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=fiap
+DB_PASSWORD=fiap123
+DB_NAME=tech_challenge
+API_PORT=8080
+```
+
+### Cloud Run (Terraform)
+
+As variáveis são injetadas automaticamente pelo Terraform:
+
+```hcl
+DB_HOST=/cloudsql/PROJECT:REGION:INSTANCE  # Unix socket
+DB_USER=postgres
+DB_NAME=postgres
+DB_PASSWORD=(Secret Manager)
+API_PORT=8080
+```
+
+## 🐛 Troubleshooting
+
+### Erro: "connection refused" (Local)
+
+**Solução:**
+```bash
+# Verificar se PostgreSQL está rodando
+docker-compose ps
+
+# Ver logs
+docker-compose logs postgres
+```
+
+### Erro: "permission denied" (GCP)
+
+**Solução:** Verificar se a Service Account tem as permissões:
+- `roles/cloudsql.client`
+- `roles/secretmanager.secretAccessor`
+
+### Deploy falha no GitHub Actions
+
+**Solução:**
+1. Verificar se os secrets estão configurados
+2. Verificar logs do workflow
+3. Testar Terraform localmente
+
+### Cloud Run não conecta ao Cloud SQL
+
+**Solução:** Verificar se a annotation está correta no Terraform:
+```hcl
+"run.googleapis.com/cloudsql-instances" = "PROJECT:REGION:INSTANCE"
+```
+
+## 📊 Monitoramento
+
+### Logs
+
+```bash
+# Logs do Cloud Run
+gcloud run services logs read app-recomendacao-prod \
+  --region=southamerica-east1 \
+  --limit=50
+
+# Logs do Cloud SQL
+gcloud sql operations list \
+  --instance=tech-challenge-db-prod-br
+```
+
+### Métricas
+
+Acesse o **Cloud Console → Cloud Run → app-recomendacao-prod** para ver:
+- Requisições por segundo
+- Latência
+- Uso de memória/CPU
+- Erros
+
+## 🔐 Segurança
+
+- ✅ **CodeQL** - Scan automático de vulnerabilidades
+- ✅ **Dependabot** - Atualização automática de dependências
+- ✅ **Secret Manager** - Credenciais nunca em código
+- ✅ **HTTPS** - Automático no Cloud Run
+- ✅ **IAM** - Permissões mínimas necessárias
+
+## 📝 Próximos Passos
+
+- [ ] Implementar endpoint GET para buscar recomendações
+- [ ] Adicionar testes unitários e de integração
+- [ ] Implementar autenticação JWT
+- [ ] Adicionar cache com Memorystore (Redis)
+- [ ] Configurar alertas no Cloud Monitoring
+- [ ] Adicionar documentação OpenAPI/Swagger
+
+## 👥 Contribuindo
+
+Este é um projeto acadêmico da FIAP - Tech Challenge Fase 4.
+
+## 📄 Licença
+
+Este projeto é parte do curso de Pós-Graduação da FIAP.

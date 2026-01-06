@@ -1,0 +1,45 @@
+name: Deploy Pipeline
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Autenticar Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
+
+      - name: Configurar Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Configurar Docker para GCR
+        run: gcloud auth configure-docker gcr.io
+
+      - name: Build Docker
+        run: |
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT }}/app:${{ github.sha }} ./backend
+          docker tag gcr.io/${{ secrets.GCP_PROJECT }}/app:${{ github.sha }} gcr.io/${{ secrets.GCP_PROJECT }}/app:latest
+
+      - name: Push Docker
+        run: |
+          docker push gcr.io/${{ secrets.GCP_PROJECT }}/app:${{ github.sha }}
+          docker push gcr.io/${{ secrets.GCP_PROJECT }}/app:latest
+
+      - name: Deploy Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v1
+        with:
+          service: app-recomendacao-prod
+          image: gcr.io/${{ secrets.GCP_PROJECT }}/app:${{ github.sha }}
+          region: southamerica-east1
+
+      - name: Verificar Deploy
+        run: |
+          SERVICE_URL=$(gcloud run services describe app-recomendacao-prod --region=southamerica-east1 --format='value(status.url)')
+          echo "Service URL: $SERVICE_URL"
+          curl -f $SERVICE_URL/healthcheck || exit 1

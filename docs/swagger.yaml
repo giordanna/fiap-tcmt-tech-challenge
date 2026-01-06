@@ -1,0 +1,44 @@
+openapi: 3.0.0
+info:
+  title: API de Recomendações
+  description: Microsserviço de recomendações com estratégia Strangler Fig para legado.
+  version: 1.0.0
+paths:
+  /recomendacoes:
+    post:
+      summary: Gera recomendação baseada no perfil e regras de negócio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                usuario_id:
+                  type: string
+                  example: "CLI0001"
+      responses:
+        '200':
+          description: Recomendação gerada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id_recomendacao:
+                    type: string
+                    format: uuid
+                  recomendacoes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        produto:
+                          type: object
+                          properties:
+                            nome_produto:
+                              type: string
+                        pontuacao:
+                          type: number
+                        motivo:
+                          type: string
