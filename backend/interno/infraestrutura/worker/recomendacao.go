@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"fmt"
 	"log/slog"
 
 	"backend/interno/casodeuso"
@@ -22,22 +23,43 @@ func NovoWorkerRecomendacao(servico *casodeuso.ServicoRecomendacao, bus pubsub.E
 	return worker
 }
 
-// Iniciar registra o worker como assinante do tópico
+// Iniciar registra o worker como assinante do tópico e inicia a goroutine de consumo
 func (w *WorkerRecomendacao) Iniciar() {
+	slog.Info("Inicializando Worker de Recomendação", "topico_alvo", TopicoGerarRecomendacao)
+
+	// A função Assinar inicia o processamento em background (goroutine)
 	w.bus.Assinar(TopicoGerarRecomendacao, w.processarEvento)
-	slog.Info("Worker de recomendação iniciado e assinando tópico", "topico", TopicoGerarRecomendacao)
+
+	slog.Info("Worker de recomendação iniciado com sucesso")
 }
 
 func (w *WorkerRecomendacao) processarEvento(payload interface{}) {
+	slog.Info("Mensagem recebida no worker de recomendação")
+
 	clienteID, ok := payload.(string)
 	if !ok {
-		slog.Error("Payload inválido para recomendação", "payload", payload)
+		slog.Error("Payload inválido recebido no worker: esperava string (clienteID)",
+			"payload_type", fmt.Sprintf("%T", payload),
+			"payload_value", payload)
 		return
 	}
 
-	slog.Info("Worker processando recomendação", "cliente_id", clienteID)
-	_, err := w.servico.Executar(clienteID)
-	if err != nil {
-		slog.Error("Erro no worker ao processar recomendação", "erro", err, "cliente_id", clienteID)
+	if clienteID == "" {
+		slog.Warn("Recebido clienteID vazio no worker")
+		return
 	}
+
+	slog.Info("Iniciando processamento assíncrono para cliente", "cliente_id", clienteID)
+
+	resultado, err := w.servico.Executar(clienteID)
+	if err != nil {
+		slog.Error("Erro ao processar recomendação no worker",
+			"erro", err,
+			"cliente_id", clienteID)
+		return
+	}
+
+	slog.Info("Recomendação processada com sucesso via worker",
+		"cliente_id", clienteID,
+		"recomendacoes_geradas", len(resultado.Recomendacoes))
 }
