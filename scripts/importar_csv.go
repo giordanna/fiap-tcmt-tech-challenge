@@ -97,8 +97,7 @@ func importarClientes(db *sql.DB, caminho string) error {
 		// id_cliente, patrimonio, perfil_risco, objetivo_investimento
 		patrimonio, _ := strconv.ParseFloat(record[1], 64)
 
-		query := `INSERT INTO clientes (id_cliente, patrimonio_total_estimado, perfil_risco, objetivo_investimento) 
-		          VALUES ($1, $2, $3, $4) ON CONFLICT (id_cliente) DO NOTHING`
+		query := `INSERT INTO clientes (id_cliente, patrimonio_total_estimado, perfil_risco, objetivo_investimento) VALUES ($1, $2, $3, $4) ON CONFLICT (id_cliente) DO NOTHING`
 
 		_, err = db.Exec(query, record[0], patrimonio, record[2], record[3])
 		if err != nil {
@@ -146,8 +145,7 @@ func importarProdutos(db *sql.DB, caminho string) error {
 		taxaAdmin, _ := strconv.ParseFloat(record[6], 64)
 		aplicacaoMinima, _ := strconv.ParseFloat(record[7], 64)
 
-		query := `INSERT INTO produtos (id_produto, nome_produto, tipo_produto, risco_associado, rentabilidade_historica_12m, rentabilidade_historica_36m, taxa_administracao, aplicacao_minima, liquidez, status_produto) 
-		          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (id_produto) DO NOTHING`
+		query := `INSERT INTO produtos (id_produto, nome_produto, tipo_produto, risco_associado, rentabilidade_historica_12m, rentabilidade_historica_36m, taxa_administracao, aplicacao_minima, liquidez, status_produto) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (id_produto) DO NOTHING`
 
 		_, err = db.Exec(query, record[0], record[1], record[2], record[3], rentabilidade12m, rentabilidade36m, taxaAdmin, aplicacaoMinima, record[8], record[9])
 		if err != nil {
@@ -191,8 +189,7 @@ func importarTransacoes(db *sql.DB, caminho string) error {
 		// id_transacao, id_cliente, id_produto, tipo_transacao, valor_transacao, data_transacao, status_transacao
 		valorTransacao, _ := strconv.ParseFloat(record[4], 64)
 
-		query := `INSERT INTO transacoes (id_transacao, id_cliente, id_produto, tipo_transacao, valor_transacao, data_transacao, status_transacao) 
-		          VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id_transacao) DO NOTHING`
+		query := `INSERT INTO transacoes (id_transacao, id_cliente, id_produto, tipo_transacao, valor_transacao, data_transacao, status_transacao) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id_transacao) DO NOTHING`
 
 		_, err = db.Exec(query, record[0], record[1], record[2], record[3], valorTransacao, record[5], record[6])
 		if err != nil {
@@ -236,8 +233,7 @@ func importarInteracoes(db *sql.DB, caminho string) error {
 		// id_interacao, id_cliente, id_produto, tipo_interacao, data_interacao, duracao_interacao_segundos
 		duracao, _ := strconv.Atoi(record[5])
 
-		query := `INSERT INTO interacoes (id_interacao, id_cliente, id_produto, tipo_interacao, data_interacao, duracao_interacao_segundos) 
-		          VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id_interacao) DO NOTHING`
+		query := `INSERT INTO interacoes (id_interacao, id_cliente, id_produto, tipo_interacao, data_interacao, duracao_interacao_segundos) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id_interacao) DO NOTHING`
 
 		_, err = db.Exec(query, record[0], record[1], record[2], record[3], record[4], duracao)
 		if err != nil {
