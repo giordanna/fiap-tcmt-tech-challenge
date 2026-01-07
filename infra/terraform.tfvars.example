@@ -15,15 +15,7 @@ db_password = "sua-senha-aqui"
 # Obtenha em: Firebase Console → Project Settings → General → Web API Key
 firebase_api_key = "sua-api-key-aqui"
 
-# Firebase Credentials JSON
-# Conteúdo do arquivo JSON gerado no Firebase Console → Project Settings → Service accounts
-firebase_credentials_json = <<EOT
-{
-  "type": "service_account",
-  "project_id": "seu-projeto",
-  ...
-}
-EOT
+
 
 # Canais de notificação (opcional)
 # Lista de IDs de canais do Cloud Monitoring para alertas

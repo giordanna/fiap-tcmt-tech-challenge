@@ -66,27 +66,7 @@ provider "google" {
 }
 
 # 1. Secret Manager
-variable "firebase_credentials_json" {
-  description = "Conteúdo JSON das credenciais do Firebase (Base64 ou Raw)"
-  type        = string
-  sensitive   = true
-}
 
-resource "google_secret_manager_secret" "firebase_credentials" {
-  secret_id = "firebase-credentials"
-  replication {
-    user_managed {
-      replicas {
-        location = "southamerica-east1"
-      }
-    }
-  }
-}
-
-resource "google_secret_manager_secret_version" "firebase_credentials_version" {
-  secret      = google_secret_manager_secret.firebase_credentials.id
-  secret_data = var.firebase_credentials_json
-}
 
 resource "google_secret_manager_secret" "firebase_api_key" {
   secret_id = "firebase-api-key"
@@ -135,11 +115,7 @@ resource "google_secret_manager_secret_iam_member" "secret_access" {
   member    = "serviceAccount:${google_service_account.cloudrun_sa.email}"
 }
 
-resource "google_secret_manager_secret_iam_member" "firebase_secret_access" {
-  secret_id = google_secret_manager_secret.firebase_credentials.id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.cloudrun_sa.email}"
-}
+
 
 resource "google_secret_manager_secret_iam_member" "firebase_api_key_secret_access" {
   secret_id = google_secret_manager_secret.firebase_api_key.id
