@@ -1,3 +1,0 @@
-pandas
-Faker
-firebase-admin

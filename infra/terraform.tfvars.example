@@ -1,0 +1,22 @@
+# Exemplo de arquivo de variáveis para Terraform
+# Copie este arquivo para terraform.tfvars e preencha com seus valores
+
+# ID do projeto GCP
+gcp_project_id = "fiap-tech-challenge"
+
+# Ambiente (dev, staging ou prod)
+environment = "dev"
+
+# Senha do banco de dados
+# NUNCA commite este arquivo com a senha real!
+db_password = "sua-senha-aqui"
+
+# Firebase API Key
+# Obtenha em: Firebase Console → Project Settings → General → Web API Key
+firebase_api_key = "sua-api-key-aqui"
+
+
+
+# Canais de notificação (opcional)
+# Lista de IDs de canais do Cloud Monitoring para alertas
+notification_channels = []

@@ -1,0 +1,397 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Microsserviço de recomendações com estratégia Strangler Fig para legado.",
+        "title": "API de Recomendações",
+        "contact": {},
+        "version": "1.0.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/api/v2/auth/login": {
+            "post": {
+                "description": "Gera um ID token JWT do Firebase para um usuário específico",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Autenticação"
+                ],
+                "summary": "Gerar token de autenticação",
+                "parameters": [
+                    {
+                        "description": "Credenciais de login",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controladores.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Token gerado com sucesso",
+                        "schema": {
+                            "$ref": "#/definitions/controladores.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Requisição inválida",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Credenciais inválidas",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno do servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/auth/verify": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Verifica se o token JWT fornecido é válido",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Autenticação"
+                ],
+                "summary": "Verificar token",
+                "responses": {
+                    "200": {
+                        "description": "Token válido",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Token inválido",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/healthcheck": {
+            "get": {
+                "description": "Retorna status OK se a API estiver no ar",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Verificação de saúde",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/recomendacoes": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Dispara processo assíncrono para gerar recomendações para todos os clientes",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "recomendacoes"
+                ],
+                "summary": "Gera recomendações em massa",
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/recomendacoes/{clienteId}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retorna as últimas recomendações geradas para o cliente",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "recomendacoes"
+                ],
+                "summary": "Busca recomendações recentes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID do Cliente",
+                        "name": "clienteId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dominio.ResultadoRecomendacao"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Publica uma mensagem para gerar recomendações em background para o cliente informado",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "recomendacoes"
+                ],
+                "summary": "Solicita geração de recomendação",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID do Cliente",
+                        "name": "clienteId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "controladores.LoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "usuario@exemplo.com"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "example": "senha123"
+                }
+            }
+        },
+        "controladores.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "usuario@exemplo.com"
+                },
+                "expiresIn": {
+                    "type": "string",
+                    "example": "3600"
+                },
+                "idToken": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMzQ1Njc4OTAifQ..."
+                },
+                "refreshToken": {
+                    "type": "string",
+                    "example": "..."
+                },
+                "uid": {
+                    "type": "string",
+                    "example": "abc123def456"
+                }
+            }
+        },
+        "dominio.Produto": {
+            "type": "object",
+            "properties": {
+                "aplicacao_minima": {
+                    "type": "number"
+                },
+                "id_produto": {
+                    "type": "string"
+                },
+                "nome_produto": {
+                    "type": "string"
+                },
+                "rentabilidade_12m": {
+                    "type": "number"
+                },
+                "risco_associado": {
+                    "type": "string"
+                }
+            }
+        },
+        "dominio.RecomendacaoItem": {
+            "type": "object",
+            "properties": {
+                "motivo": {
+                    "type": "string"
+                },
+                "pontuacao": {
+                    "type": "number"
+                },
+                "produto": {
+                    "$ref": "#/definitions/dominio.Produto"
+                }
+            }
+        },
+        "dominio.ResultadoRecomendacao": {
+            "type": "object",
+            "properties": {
+                "id_cliente": {
+                    "type": "string"
+                },
+                "id_recomendacao": {
+                    "description": "uuid gerado",
+                    "type": "string"
+                },
+                "recomendacoes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dominio.RecomendacaoItem"
+                    }
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Token JWT do Firebase Auth. Formato: Bearer {token}",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

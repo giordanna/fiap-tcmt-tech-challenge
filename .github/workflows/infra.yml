@@ -1,0 +1,66 @@
+name: Provisionar Infraestrutura (Terraform)
+
+on:
+  workflow_dispatch: # Disparo manual
+    inputs:
+      environment:
+        description: "Ambiente (dev, staging ou prod)"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      action:
+        description: "Ação do Terraform (plan ou apply)"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+
+jobs:
+  terraform:
+    name: Terraform - ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Autenticar Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform -chdir=infra init
+
+      - name: Terraform Plan
+        if: inputs.action == 'plan'
+        run: |
+          terraform -chdir=infra plan \
+            -var="gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var="environment=${{ inputs.environment }}" \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="firebase_api_key=${{ secrets.FIREBASE_API_KEY }}" \
+            -var="firebase_credentials_json='${{ secrets.FIREBASE_CREDENTIALS }}'"
+
+      - name: Terraform Apply
+        if: inputs.action == 'apply'
+        run: |
+          terraform -chdir=infra apply -auto-approve \
+            -var="gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var="environment=${{ inputs.environment }}" \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="firebase_api_key=${{ secrets.FIREBASE_API_KEY }}" \
+            -var="firebase_credentials_json='${{ secrets.FIREBASE_CREDENTIALS }}'"
+
+      - name: Exibir Outputs
+        if: inputs.action == 'apply'
+        run: terraform -chdir=infra output

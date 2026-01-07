@@ -1,0 +1,262 @@
+basePath: /
+definitions:
+  controladores.LoginRequest:
+    properties:
+      email:
+        example: usuario@exemplo.com
+        type: string
+      password:
+        example: senha123
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  controladores.LoginResponse:
+    properties:
+      email:
+        example: usuario@exemplo.com
+        type: string
+      expiresIn:
+        example: "3600"
+        type: string
+      idToken:
+        example: eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMzQ1Njc4OTAifQ...
+        type: string
+      refreshToken:
+        example: '...'
+        type: string
+      uid:
+        example: abc123def456
+        type: string
+    type: object
+  dominio.Produto:
+    properties:
+      aplicacao_minima:
+        type: number
+      id_produto:
+        type: string
+      nome_produto:
+        type: string
+      rentabilidade_12m:
+        type: number
+      risco_associado:
+        type: string
+    type: object
+  dominio.RecomendacaoItem:
+    properties:
+      motivo:
+        type: string
+      pontuacao:
+        type: number
+      produto:
+        $ref: '#/definitions/dominio.Produto'
+    type: object
+  dominio.ResultadoRecomendacao:
+    properties:
+      id_cliente:
+        type: string
+      id_recomendacao:
+        description: uuid gerado
+        type: string
+      recomendacoes:
+        items:
+          $ref: '#/definitions/dominio.RecomendacaoItem'
+        type: array
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Microsserviço de recomendações com estratégia Strangler Fig para legado.
+  title: API de Recomendações
+  version: 1.0.0
+paths:
+  /api/v2/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Gera um ID token JWT do Firebase para um usuário específico
+      parameters:
+      - description: Credenciais de login
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controladores.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token gerado com sucesso
+          schema:
+            $ref: '#/definitions/controladores.LoginResponse'
+        "400":
+          description: Requisição inválida
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Credenciais inválidas
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Erro interno do servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Gerar token de autenticação
+      tags:
+      - Autenticação
+  /api/v2/auth/verify:
+    get:
+      description: Verifica se o token JWT fornecido é válido
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token válido
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Token inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Verificar token
+      tags:
+      - Autenticação
+  /api/v2/healthcheck:
+    get:
+      description: Retorna status OK se a API estiver no ar
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Verificação de saúde
+      tags:
+      - health
+  /api/v2/recomendacoes:
+    post:
+      consumes:
+      - application/json
+      description: Dispara processo assíncrono para gerar recomendações para todos
+        os clientes
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Gera recomendações em massa
+      tags:
+      - recomendacoes
+  /api/v2/recomendacoes/{clienteId}:
+    get:
+      consumes:
+      - application/json
+      description: Retorna as últimas recomendações geradas para o cliente
+      parameters:
+      - description: ID do Cliente
+        in: path
+        name: clienteId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dominio.ResultadoRecomendacao'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Busca recomendações recentes
+      tags:
+      - recomendacoes
+    post:
+      consumes:
+      - application/json
+      description: Publica uma mensagem para gerar recomendações em background para
+        o cliente informado
+      parameters:
+      - description: ID do Cliente
+        in: path
+        name: clienteId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Solicita geração de recomendação
+      tags:
+      - recomendacoes
+securityDefinitions:
+  BearerAuth:
+    description: 'Token JWT do Firebase Auth. Formato: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
