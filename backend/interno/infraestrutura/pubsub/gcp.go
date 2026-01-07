@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/pubsub"
 )
@@ -140,7 +141,7 @@ func (b *GCPEventBus) Assinar(nomeTopico string, handler func(payload interface{
 		// Cria a subscription
 		sub, err = b.client.CreateSubscription(b.ctx, subscriptionName, pubsub.SubscriptionConfig{
 			Topic:       topic,
-			AckDeadline: 60, // 60 segundos para processar a mensagem
+			AckDeadline: 60 * time.Second, // 60 segundos para processar a mensagem
 		})
 		if err != nil {
 			slog.Error("Erro ao criar subscription", "subscription", subscriptionName, "erro", err)

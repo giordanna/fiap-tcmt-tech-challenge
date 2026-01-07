@@ -7,6 +7,7 @@
 bin/
 *.test
 *.out
+backend/backend
 
 # Ignorar arquivos de dependências Go
 vendor/
