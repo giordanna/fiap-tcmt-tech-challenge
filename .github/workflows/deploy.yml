@@ -23,24 +23,24 @@ jobs:
       - name: Configurar Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Configurar Docker para GCR
-        run: gcloud auth configure-docker gcr.io
+      - name: Configurar Docker para Artifact Registry
+        run: gcloud auth configure-docker southamerica-east1-docker.pkg.dev
 
       - name: Build Docker
         run: |
-          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:${{ github.sha }} ./backend
-          docker tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:${{ github.sha }} gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:latest
+          docker build -t southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-repo/app:${{ github.sha }} ./backend
+          docker tag southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-repo/app:${{ github.sha }} southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-repo/app:latest
 
       - name: Push Docker
         run: |
-          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:${{ github.sha }}
-          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:latest
+          docker push southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-repo/app:${{ github.sha }}
+          docker push southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-repo/app:latest
 
       - name: Deploy Cloud Run
         uses: google-github-actions/deploy-cloudrun@v1
         with:
-          service: ${{ env.ENVIRONMENT == 'prod' && 'app-recomendacao' || format('app-recomendacao-{0}', env.ENVIRONMENT) }}
-          image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:${{ github.sha }}
+          service: app-recomendacao${{ env.ENVIRONMENT != 'prod' && format('-{0}', env.ENVIRONMENT) || '' }}
+          image: southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-repo/app:${{ github.sha }}
           region: southamerica-east1
           env_vars: |
             GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}

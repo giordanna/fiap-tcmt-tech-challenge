@@ -185,7 +185,15 @@ resource "google_sql_database_instance" "postgres" {
   deletion_protection = local.db_config.deletion_protection
 }
 
-# 4. Cloud Run
+# 4. Artifact Registry
+resource "google_artifact_registry_repository" "app_repo" {
+  location      = "southamerica-east1"
+  repository_id = "app-repo"
+  description   = "Docker repository for Application"
+  format        = "DOCKER"
+}
+
+# 5. Cloud Run
 resource "google_cloud_run_service" "backend" {
   name     = "app-recomendacao${local.env_suffix}"
   location = "southamerica-east1"
@@ -201,7 +209,7 @@ resource "google_cloud_run_service" "backend" {
       service_account_name = google_service_account.cloudrun_sa.email
 
       containers {
-        image = "gcr.io/${var.gcp_project_id}/app:latest"
+        image = "${google_artifact_registry_repository.app_repo.location}-docker.pkg.dev/${var.gcp_project_id}/${google_artifact_registry_repository.app_repo.repository_id}/app:latest"
 
         env {
           name  = "DB_HOST"
