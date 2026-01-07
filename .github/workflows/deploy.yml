@@ -1,6 +1,7 @@
 name: Deploy Pipeline
 
 on:
+  workflow_dispatch: # Disparo manual
   push:
     branches: ["main", "dev", "staging"]
 
