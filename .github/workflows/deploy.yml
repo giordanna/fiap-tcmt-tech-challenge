@@ -39,7 +39,7 @@ jobs:
       - name: Deploy Cloud Run
         uses: google-github-actions/deploy-cloudrun@v1
         with:
-          service: app-recomendacao${{ env.ENVIRONMENT != 'prod' && format('-{0}', env.ENVIRONMENT) || '' }}
+          service: ${{ env.ENVIRONMENT == 'prod' && 'app-recomendacao' || format('app-recomendacao-{0}', env.ENVIRONMENT) }}
           image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:${{ github.sha }}
           region: southamerica-east1
           env_vars: |
