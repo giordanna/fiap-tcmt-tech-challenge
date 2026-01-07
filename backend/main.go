@@ -135,7 +135,7 @@ func main() {
 	}
 
 	// Inicializa Worker de Recomendação
-	workerRecom := worker.NovoWorkerRecomendacao(servico, bus)
+	workerRecom := worker.NovoWorkerRecomendacao(servico, eventBus)
 	workerRecom.Iniciar()
 
 	// Configuração do Gin
