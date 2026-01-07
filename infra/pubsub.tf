@@ -16,7 +16,7 @@ resource "google_pubsub_topic" "gerar_recomendacao" {
 
 # Subscription para o worker de recomendações
 resource "google_pubsub_subscription" "gerar_recomendacao_sub" {
-  name    = "gerar-recomendacao-sub${local.env_suffix}"
+  name    = "${google_pubsub_topic.gerar_recomendacao.name}-sub"
   topic   = google_pubsub_topic.gerar_recomendacao.name
   project = var.gcp_project_id
 
@@ -89,7 +89,7 @@ resource "google_pubsub_topic_iam_member" "cloud_run_publisher" {
   project = var.gcp_project_id
   topic   = google_pubsub_topic.gerar_recomendacao.name
   role    = "roles/pubsub.publisher"
-  member  = "serviceAccount:${google_service_account.cloud_run.email}"
+  member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
 }
 
 # IAM: Permissão para Cloud Run consumir mensagens
@@ -97,7 +97,7 @@ resource "google_pubsub_subscription_iam_member" "cloud_run_subscriber" {
   project      = var.gcp_project_id
   subscription = google_pubsub_subscription.gerar_recomendacao_sub.name
   role         = "roles/pubsub.subscriber"
-  member       = "serviceAccount:${google_service_account.cloud_run.email}"
+  member       = "serviceAccount:${google_service_account.cloudrun_sa.email}"
 }
 
 # Alerta para mensagens na DLQ - APENAS PRODUÇÃO

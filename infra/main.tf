@@ -127,10 +127,7 @@ resource "google_service_account" "cloudrun_sa" {
   display_name = "Cloud Run Service Account (todos os ambientes)"
 }
 
-resource "google_service_account" "cloud_run" {
-  account_id   = "cloudrun-pubsub"
-  display_name = "Cloud Run Pub/Sub Service Account (todos os ambientes)"
-}
+
 
 resource "google_secret_manager_secret_iam_member" "secret_access" {
   secret_id = google_secret_manager_secret.db_pass_secret.id
@@ -239,6 +236,10 @@ resource "google_cloud_run_service" "backend" {
         env {
           name  = "GCP_PROJECT_ID"
           value = var.gcp_project_id
+        }
+        env {
+          name  = "APP_ENV"
+          value = var.environment
         }
         env {
           name = "FIREBASE_API_KEY"
