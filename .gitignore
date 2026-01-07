@@ -9,7 +9,6 @@ bin/
 *.out
 
 # Ignorar arquivos de dependências Go
-go.sum
 vendor/
 
 # Ignorar arquivos de ambiente
@@ -56,3 +55,5 @@ terraform.tfvars.*
 
 firebase-credentials.json
 gcp-credentials.json
+
+scripts/go.sum
