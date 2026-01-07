@@ -251,7 +251,19 @@ resource "google_cloud_run_service" "backend" {
         }
         # Firebase usa Application Default Credentials (ADC) no Cloud Run
         # Não precisa de FIREBASE_CREDENTIALS_PATH pois a service account já tem permissão
+        
+        # Limites de recursos
+        resources {
+          limits = {
+            cpu    = "1000m"
+            memory = "512Mi"
+          }
+        }
       }
+      
+      # Concorrência e Timeout
+      container_concurrency = 30
+      timeout_seconds       = 300
     }
   }
 
@@ -259,6 +271,15 @@ resource "google_cloud_run_service" "backend" {
     percent         = 100
     latest_revision = true
   }
+}
+
+# Permite acesso público (unauthenticated) à API
+resource "google_cloud_run_service_iam_member" "public_access" {
+  location = google_cloud_run_service.backend.location
+  project  = google_cloud_run_service.backend.project
+  service  = google_cloud_run_service.backend.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
 }
 
 output "url_api" {
