@@ -60,23 +60,8 @@ func main() {
 	dbName := getEnv("DB_NAME", "tech_challenge")
 	apiPort := getEnv("API_PORT", "8080")
 
-	// Configuração dinâmica do Host do Swagger
-	swaggerHost := getEnv("SWAGGER_HOST", "")
-	if swaggerHost == "" {
-		// Se não houver host explícito, tenta pegar da BASE_URL (comum em Cloud Run)
-		baseURL := getEnv("BASE_URL", "")
-		if baseURL != "" {
-			if u, err := url.Parse(baseURL); err == nil {
-				swaggerHost = u.Host
-			} else {
-				swaggerHost = baseURL
-			}
-		} else {
-			// Fallback para localhost com a porta configurada
-			swaggerHost = fmt.Sprintf("localhost:%s", apiPort)
-		}
-	}
-	docs.SwaggerInfo.Host = swaggerHost
+	// Deixar Host vazio para que o Swagger use a URL atual do navegador
+	docs.SwaggerInfo.Host = ""
 
 	// String de conexão PostgreSQL
 	// Suporta tanto Unix socket (Cloud SQL) quanto TCP (desenvolvimento local)
