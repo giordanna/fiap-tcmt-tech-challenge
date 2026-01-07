@@ -108,16 +108,16 @@ func main() {
 	}
 
 	ctx := context.Background()
-	bus, err := pubsub.NovoGCPEventBus(ctx, gcpProjectID, appEnv)
+	eventBus, err := pubsub.NovoGCPEventBus(ctx, gcpProjectID, appEnv)
 	if err != nil {
 		slog.Error("Erro ao inicializar GCP Pub/Sub", "erro", err)
 		os.Exit(1)
 	}
-	defer bus.Close()
+	defer eventBus.Close()
 
 	// Inicializa repositório e serviços
 	repo := repositorio.NovoRepositorioPostgres(db)
-	servico := casodeuso.NovoServicoRecomendacao(repo, bus)
+	servico := casodeuso.NovoServicoRecomendacao(repo, eventBus)
 	handler := controladores.NovoControladorRecomendacoes(servico)
 
 	// Inicializa Firebase Auth
