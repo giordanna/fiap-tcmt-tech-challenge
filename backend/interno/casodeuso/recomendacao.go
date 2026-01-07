@@ -43,11 +43,20 @@ func (s *ServicoRecomendacao) Executar(clienteID string) (*dominio.ResultadoReco
 	canal := make(chan resultadoScore, len(produtos))
 	var wg sync.WaitGroup
 
-	// processa cada produto em paralelo (goroutines)
+	// Semáforo para limitar concorrência de acesso ao banco (max 10 workers)
+	sem := make(chan struct{}, 10)
+
+	// processa cada produto em paralelo (goroutines controladas pelo semáforo)
 	for _, p := range produtos {
 		wg.Add(1)
 		go func(prod dominio.Produto) {
-			defer wg.Done()
+			// Adquire token
+			sem <- struct{}{}
+			defer func() {
+				// Libera token e sinaliza conclusão
+				<-sem
+				wg.Done()
+			}()
 			score := 0.0
 			motivo := ""
 
