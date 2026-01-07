@@ -16,41 +16,19 @@ Sistema de recomendações de investimentos desenvolvido em **Golang** com **Pos
 - [Desenvolvimento Local](#desenvolvimento-local)
 - [Deploy no GCP](#deploy-no-gcp)
 - [API Endpoints](#api-endpoints)
+- [Autenticação](#autenticação)
 - [Estrutura do Projeto](#estrutura-do-projeto)
-
-## ☁️ Arquitetura GCP
-
-```
-┌─────────────────────────────────────────────────┐
-│              GitHub Actions (CI/CD)             │
-│  • Build Docker Image                           │
-│  • Push to GCR                                  │
-│  • Deploy to Cloud Run                          │
-└────────────────┬────────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────────┐
-│           Cloud Run (Serverless)                │
-│  • Container: Golang API                        │
-│  • Auto-scaling                                 │
-│  • HTTPS automático                             │
-└────────────────┬────────────────────────────────┘
-                 │ Unix Socket
-┌────────────────▼────────────────────────────────┐
-│        Cloud SQL (PostgreSQL 15)                │
-│  • Managed database                             │
-│  • Backups automáticos                          │
-│  • Região: southamerica-east1 (São Paulo)       │
-└─────────────────────────────────────────────────┘
-```
 
 ### Componentes GCP
 
 - **Cloud Run**: Hospeda a aplicação Golang em containers serverless
 - **Cloud SQL**: PostgreSQL 15 gerenciado
 - **Pub/Sub**: Sistema de mensageria para processamento assíncrono
-- **Secret Manager**: Armazena credenciais sensíveis (senha do banco)
+- **Secret Manager**: Armazena credenciais sensíveis (senha do banco, Firebase API Key, etc)
 - **Container Registry (GCR)**: Armazena imagens Docker
 - **Terraform**: Infraestrutura como código (IaC)
+
+📖 **Para detalhes sobre gerenciamento de secrets**, consulte [docs/GCP_SECRETS.md](./docs/GCP_SECRETS.md)
 
 ## 🔄 Diferenças da Versão Node.js
 
@@ -147,11 +125,14 @@ A API estará disponível em `http://localhost:8080`
 
 No seu repositório GitHub, vá em **Settings → Secrets and variables → Actions** e adicione:
 
-| Secret               | Descrição               | Exemplo                            |
-| -------------------- | ----------------------- | ---------------------------------- |
-| `GOOGLE_CREDENTIALS` | JSON da service account | `{"type": "service_account", ...}` |
-| `GCP_PROJECT`        | ID do projeto GCP       | `my-project-123456`                |
-| `DB_PASSWORD`        | Senha do PostgreSQL     | `SenhaSegura123!`                  |
+| Secret                 | Descrição                  | Exemplo                            |
+| ---------------------- | -------------------------- | ---------------------------------- |
+| `GOOGLE_CREDENTIALS`   | JSON da service account    | `{"type": "service_account", ...}` |
+| `GCP_PROJECT`          | ID do projeto GCP          | `my-project-123456`                |
+| `DB_PASSWORD`          | Senha do PostgreSQL        | `SenhaSegura123!`                  |
+| `FIREBASE_CREDENTIALS` | JSON do Firebase Admin SDK | `{"type": "service_account", ...}` |
+
+📖 **Para instruções detalhadas**, consulte [docs/GITHUB_SECRETS.md](./docs/GITHUB_SECRETS.md)
 
 ### 2. Provisionar Infraestrutura (Terraform)
 
@@ -193,8 +174,9 @@ O GitHub Actions irá:
 
 1. ✅ Build da imagem Docker
 2. ✅ Push para GCR
-3. ✅ Deploy no Cloud Run
-4. ✅ Verificar healthcheck
+3. ✅ Criar/atualizar secrets no Secret Manager (Firebase credentials e API Key)
+4. ✅ Deploy no Cloud Run (lendo secrets do Secret Manager)
+5. ✅ Verificar healthcheck
 
 ### 4. Acessar Aplicação
 
@@ -217,13 +199,13 @@ gcloud run services describe app-recomendacao-prod \
 ### Health Check
 
 ```bash
-GET /healthcheck
+GET /api/v2/healthcheck
 ```
 
 **Exemplo:**
 
 ```bash
-curl https://app-recomendacao-prod-xxxxx.a.run.app/healthcheck
+curl https://app-recomendacao-prod-xxxxx.a.run.app/api/v2/healthcheck
 ```
 
 **Resposta:**
@@ -238,13 +220,13 @@ curl https://app-recomendacao-prod-xxxxx.a.run.app/healthcheck
 ### Gerar Recomendações
 
 ```bash
-POST /recomendacoes/:clienteId
+POST /api/v2/recomendacoes/:clienteId
 ```
 
 **Exemplo:**
 
 ```bash
-curl -X POST https://app-recomendacao-prod-xxxxx.a.run.app/recomendacoes/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
+curl -X POST https://app-recomendacao-prod-xxxxx.a.run.app/api/v2/recomendacoes/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
 ```
 
 **Resposta:**
@@ -272,7 +254,7 @@ curl -X POST https://app-recomendacao-prod-xxxxx.a.run.app/recomendacoes/a0eebc9
 ### Buscar Recomendações
 
 ```bash
-GET /recomendacoes/:clienteId
+GET /api/v2/recomendacoes/:clienteId
 ```
 
 **Nota:** Atualmente retorna 404. Implementação futura buscará do banco.
@@ -282,31 +264,47 @@ GET /recomendacoes/:clienteId
 A documentação interativa da API está disponível em:
 
 ```bash
-http://localhost:8080/swagger/index.html
+http://localhost:8080/api/v2/swagger/index.html
+```
+
+## 🔐 Autenticação
+
+A API utiliza **Firebase Authentication** com tokens JWT Bearer para proteger os endpoints.
+
+### Endpoints Públicos (sem autenticação)
+
+- `GET /api/v2/healthcheck` - Verificação de saúde
+- `POST /api/v2/auth/login` - Fazer login e obter token
+
+### Endpoints Protegidos (requerem autenticação)
+
+- `GET /api/v2/recomendacoes/:clienteId` - Buscar recomendações
+- `POST /api/v2/recomendacoes/:clienteId` - Gerar recomendações
+- `POST /api/v2/recomendacoes` - Gerar recomendações em massa
+
+### Exemplo de Uso
+
+```bash
+# 1. Fazer login
+curl -X POST http://localhost:8080/api/v2/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "usuario@exemplo.com",
+    "password": "senha123"
+  }'
+
+# 2. Usar o token nas requisições
+curl -X GET http://localhost:8080/api/v2/recomendacoes/cliente123 \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI"
 ```
 
 ## 📨 Sistema de Mensageria (Pub/Sub)
 
 O sistema utiliza **Google Cloud Pub/Sub** para processamento assíncrono de recomendações em massa.
 
-### Arquitetura
-
-```
-┌─────────────┐    Publica     ┌──────────────┐    Consome    ┌─────────────┐
-│  API POST   │───────────────▶│  GCP Pub/Sub │──────────────▶│   Worker    │
-│/recomendacoes│                │    Tópico    │               │ Recomendação│
-└─────────────┘                └──────────────┘               └─────────────┘
-                                                                      │
-                                                                      ▼
-                                                               ┌─────────────┐
-                                                               │  PostgreSQL │
-                                                               └─────────────┘
-```
-
 ### Tópicos Disponíveis
 
-- **`gerar-recomendacoes`**: Geração de recomendações para um cliente específico
-- **`gerar-recomendacoes-massiva`**: Geração de recomendações para todos os clientes
+- **`gerar-recomendacoes`**: Base (ex: `gerar-recomendacoes-dev`). Geração de recomendações para um cliente específico
 
 ### Funcionamento
 
@@ -345,6 +343,7 @@ tech-challenge-fase4/
 │   │       ├── repositorio/   # Acesso a dados
 │   │       ├── pubsub/        # Event Bus (GCP Pub/Sub)
 │   │       ├── worker/        # Workers assíncronos
+│   │       ├── middleware/    # Middlewares (Auth, etc)
 │   │       └── logger/        # Logging
 │   ├── Dockerfile             # Container da API
 │   └── go.mod                 # Dependências
@@ -362,6 +361,8 @@ tech-challenge-fase4/
 ### Desenvolvimento Local (`.env`)
 
 ```bash
+APP_ENV=dev
+
 DB_HOST=localhost
 DB_PORT=5432
 DB_USER=fiap
@@ -371,68 +372,9 @@ API_PORT=8080
 API_LEGADA_BASE_URL=http://localhost:8081
 
 GCP_PROJECT_ID=seu-projeto-gcp
+FIREBASE_CREDENTIALS_PATH=/caminho/para/firebase-credentials.json
+FIREBASE_API_KEY=seu-api-key
 ```
-
-## 🐛 Troubleshooting
-
-### Erro: "connection refused" (Local)
-
-**Solução:**
-
-```bash
-# Verificar se PostgreSQL está rodando
-docker-compose ps
-
-# Ver logs
-docker-compose logs postgres
-```
-
-### Erro: "permission denied" (GCP)
-
-**Solução:** Verificar se a Service Account tem as permissões:
-
-- `roles/cloudsql.client`
-- `roles/secretmanager.secretAccessor`
-
-### Deploy falha no GitHub Actions
-
-**Solução:**
-
-1. Verificar se os secrets estão configurados
-2. Verificar logs do workflow
-3. Testar Terraform localmente
-
-### Cloud Run não conecta ao Cloud SQL
-
-**Solução:** Verificar se a annotation está correta no Terraform:
-
-```hcl
-"run.googleapis.com/cloudsql-instances" = "PROJECT:REGION:INSTANCE"
-```
-
-## 📊 Monitoramento
-
-### Logs
-
-```bash
-# Logs do Cloud Run
-gcloud run services logs read app-recomendacao-prod \
-  --region=southamerica-east1 \
-  --limit=50
-
-# Logs do Cloud SQL
-gcloud sql operations list \
-  --instance=tech-challenge-db-prod-br
-```
-
-### Métricas
-
-Acesse o **Cloud Console → Cloud Run → app-recomendacao-prod** para ver:
-
-- Requisições por segundo
-- Latência
-- Uso de memória/CPU
-- Erros
 
 ## 🔐 Segurança
 
@@ -445,9 +387,7 @@ Acesse o **Cloud Console → Cloud Run → app-recomendacao-prod** para ver:
 ## 📝 Próximos Passos
 
 - [x] Implementar endpoint GET para buscar recomendações
-- [ ] Adicionar testes unitários e de integração
-- [ ] Implementar autenticação JWT
-- [ ] Adicionar cache com Memorystore (Redis)
+- [x] Implementar autenticação JWT com Firebase Auth
 - [ ] Configurar alertas no Cloud Monitoring
 - [x] Adicionar documentação OpenAPI/Swagger
 

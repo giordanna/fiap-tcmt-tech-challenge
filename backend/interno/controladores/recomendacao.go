@@ -17,37 +17,29 @@ func NovoControladorRecomendacoes(servico *casodeuso.ServicoRecomendacao) *Contr
 	return &ControladorRecomendacoes{servico: servico}
 }
 
-// GerarRecomendacoes gera novas recomendações para um cliente
-// @Summary      Gera novas recomendações
-// @Description  Gera e persiste novas recomendações para o cliente informado
+// GerarRecomendacoes gera novas recomendações para um cliente de forma assíncrona
+// @Summary      Solicita geração de recomendação
+// @Description  Publica uma mensagem para gerar recomendações em background para o cliente informado
 // @Tags         recomendacoes
 // @Accept       json
 // @Produce      json
 // @Param        clienteId   path      string  true  "ID do Cliente"
-// @Success      200  {object}  dominio.ResultadoRecomendacao
+// @Success      202  {object}  map[string]string
+// @Failure      401  {object}  map[string]string
 // @Failure      500  {object}  map[string]string
+// @Security     BearerAuth
 // @Router       /api/v2/recomendacoes/{clienteId} [post]
 func (h *ControladorRecomendacoes) GerarRecomendacoes(c *gin.Context) {
 	clienteID := c.Param("clienteId")
 
-	slog.Info("Gerando recomendações", "cliente_id", clienteID)
+	slog.Info("Solicitando geração de recomendações (async)", "cliente_id", clienteID)
 
-	resultado, err := h.servico.Executar(clienteID)
-	if err != nil {
-		slog.Error("Erro ao gerar recomendações", "erro", err, "cliente_id", clienteID)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"erro":     "Erro ao gerar recomendações",
-			"detalhes": err.Error(),
-		})
-		return
-	}
+	h.servico.SolicitarGeracao(clienteID)
 
-	slog.Info("Recomendações geradas com sucesso",
-		"cliente_id", clienteID,
-		"recomendacao_id", resultado.ID,
-		"total_recomendacoes", len(resultado.Recomendacoes))
-
-	c.JSON(http.StatusOK, resultado)
+	c.JSON(http.StatusAccepted, gin.H{
+		"mensagem":   "Solicitação recebida com sucesso",
+		"cliente_id": clienteID,
+	})
 }
 
 // GerarRecomendacoesMassiva dispara geração de recomendações para todos os clientes
@@ -57,7 +49,9 @@ func (h *ControladorRecomendacoes) GerarRecomendacoes(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Success      202  {object}  map[string]string
+// @Failure      401  {object}  map[string]string
 // @Failure      500  {object}  map[string]string
+// @Security     BearerAuth
 // @Router       /api/v2/recomendacoes [post]
 func (h *ControladorRecomendacoes) GerarRecomendacoesMassiva(c *gin.Context) {
 	slog.Info("Iniciando processo de geração de recomendações em massa")
@@ -84,7 +78,9 @@ func (h *ControladorRecomendacoes) GerarRecomendacoesMassiva(c *gin.Context) {
 // @Produce      json
 // @Param        clienteId   path      string  true  "ID do Cliente"
 // @Success      200  {object}  dominio.ResultadoRecomendacao
+// @Failure      401  {object}  map[string]string
 // @Failure      404  {object}  map[string]string
+// @Security     BearerAuth
 // @Router       /api/v2/recomendacoes/{clienteId} [get]
 func (h *ControladorRecomendacoes) BuscarRecomendacoes(c *gin.Context) {
 	clienteID := c.Param("clienteId")

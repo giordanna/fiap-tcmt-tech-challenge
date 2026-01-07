@@ -17,10 +17,11 @@ type GCPEventBus struct {
 	handlers map[string][]func(interface{})
 	mu       sync.RWMutex
 	subs     map[string]*pubsub.Subscription
+	ambiente string
 }
 
 // NovoGCPEventBus cria uma nova instância do EventBus usando GCP Pub/Sub
-func NovoGCPEventBus(ctx context.Context, projectID string) (*GCPEventBus, error) {
+func NovoGCPEventBus(ctx context.Context, projectID, ambiente string) (*GCPEventBus, error) {
 	client, err := pubsub.NewClient(ctx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao criar cliente Pub/Sub: %w", err)
@@ -31,14 +32,25 @@ func NovoGCPEventBus(ctx context.Context, projectID string) (*GCPEventBus, error
 		ctx:      ctx,
 		handlers: make(map[string][]func(interface{})),
 		subs:     make(map[string]*pubsub.Subscription),
+		ambiente: ambiente,
 	}
 
-	slog.Info("GCP Pub/Sub inicializado", "projectID", projectID)
+	slog.Info("GCP Pub/Sub inicializado", "projectID", projectID, "ambiente", ambiente)
 	return bus, nil
 }
 
+// formatarTopico retorna o nome do tópico formatado com o ambiente
+func (b *GCPEventBus) formatarTopico(topico string) string {
+	if b.ambiente == "" {
+		return topico
+	}
+	return fmt.Sprintf("%s-%s", topico, b.ambiente)
+}
+
 // Publicar publica um evento em um tópico do GCP Pub/Sub
-func (b *GCPEventBus) Publicar(topico string, payload interface{}) {
+func (b *GCPEventBus) Publicar(nomeTopico string, payload interface{}) {
+	topico := b.formatarTopico(nomeTopico)
+
 	// Serializa o payload para JSON
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -82,7 +94,9 @@ func (b *GCPEventBus) Publicar(topico string, payload interface{}) {
 }
 
 // Assinar registra um handler para um tópico e inicia o consumo de mensagens
-func (b *GCPEventBus) Assinar(topico string, handler func(payload interface{})) {
+func (b *GCPEventBus) Assinar(nomeTopico string, handler func(payload interface{})) {
+	topico := b.formatarTopico(nomeTopico)
+
 	b.mu.Lock()
 	b.handlers[topico] = append(b.handlers[topico], handler)
 

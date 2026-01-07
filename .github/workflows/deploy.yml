@@ -2,18 +2,23 @@ name: Deploy Pipeline
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: ["main", "dev", "staging"]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
+    # Define o ambiente baseado na branch
+    env:
+      ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'prod' || (github.ref == 'refs/heads/staging' && 'staging' || 'dev') }}
+
     steps:
       - uses: actions/checkout@v3
 
       - name: Autenticar Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
+          credentials_json: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
 
       - name: Configurar Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
@@ -23,23 +28,31 @@ jobs:
 
       - name: Build Docker
         run: |
-          docker build -t gcr.io/${{ secrets.GCP_PROJECT }}/app:${{ github.sha }} ./backend
-          docker tag gcr.io/${{ secrets.GCP_PROJECT }}/app:${{ github.sha }} gcr.io/${{ secrets.GCP_PROJECT }}/app:latest
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:${{ github.sha }} ./backend
+          docker tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:${{ github.sha }} gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:latest
 
       - name: Push Docker
         run: |
-          docker push gcr.io/${{ secrets.GCP_PROJECT }}/app:${{ github.sha }}
-          docker push gcr.io/${{ secrets.GCP_PROJECT }}/app:latest
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:${{ github.sha }}
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:latest
 
       - name: Deploy Cloud Run
         uses: google-github-actions/deploy-cloudrun@v1
         with:
-          service: app-recomendacao-prod
-          image: gcr.io/${{ secrets.GCP_PROJECT }}/app:${{ github.sha }}
+          service: app-recomendacao${{ env.ENVIRONMENT != 'prod' && format('-{0}', env.ENVIRONMENT) || '' }}
+          image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/app:${{ github.sha }}
           region: southamerica-east1
+          env_vars: |
+            GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
 
       - name: Verificar Deploy
         run: |
-          SERVICE_URL=$(gcloud run services describe app-recomendacao-prod --region=southamerica-east1 --format='value(status.url)')
+          SERVICE_NAME="app-recomendacao"
+          if [ "$ENVIRONMENT" != "prod" ]; then
+            SERVICE_NAME="${SERVICE_NAME}-${ENVIRONMENT}"
+          fi
+
+          SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=southamerica-east1 --format='value(status.url)')
           echo "Service URL: $SERVICE_URL"
-          curl -f $SERVICE_URL/healthcheck || exit 1
+          echo "Environment: $ENVIRONMENT"
+          curl -f $SERVICE_URL/api/v2/healthcheck || exit 1

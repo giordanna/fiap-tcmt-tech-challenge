@@ -1,5 +1,5 @@
 # estágio de build
-FROM golang:1.21 AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
@@ -7,18 +7,25 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# compilação estática
+# compilação estática com otimizações
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o api-gateway ./main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o api-gateway ./main.go
 
 # estágio final (imagem leve)
 FROM alpine:latest
 
-WORKDIR /root/
-COPY --from=builder /app/api-gateway .
+# Instala certificados e timezone
+RUN apk --no-cache add ca-certificates tzdata
 
-# certificados para chamadas https externas
-RUN apk --no-cache add ca-certificates
+# Configura timezone padrão
+ENV TZ=America/Sao_Paulo
+
+# Cria usuário não-root para segurança
+RUN adduser -D -g '' appuser
+USER appuser
+
+WORKDIR /app
+COPY --from=builder /app/api-gateway .
 
 EXPOSE 8080
 CMD ["./api-gateway"]

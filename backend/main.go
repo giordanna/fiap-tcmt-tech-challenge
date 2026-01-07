@@ -25,6 +25,7 @@ import (
 	"backend/interno/casodeuso"
 	"backend/interno/controladores"
 	"backend/interno/infraestrutura/logger"
+	"backend/interno/infraestrutura/middleware"
 	"backend/interno/infraestrutura/pubsub"
 	"backend/interno/infraestrutura/repositorio"
 	"backend/interno/infraestrutura/worker"
@@ -37,7 +38,10 @@ import (
 // @host      localhost:8080
 // @BasePath  /
 
-// @securityDefinitions.basic BasicAuth
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Token JWT do Firebase Auth. Formato: Bearer {token}
 
 func main() {
 	// Inicializa logger estruturado
@@ -45,7 +49,9 @@ func main() {
 	slog.Info("Iniciando API de Recomendações...")
 
 	// Carrega variáveis de ambiente (ignora erro se .env não existir)
-	_ = godotenv.Load()
+	if err := godotenv.Load("../.env"); err != nil {
+		slog.Warn("Aviso: arquivo .env não encontrado, usando variáveis de ambiente do sistema")
+	}
 
 	// Configuração do banco de dados
 	dbHost := getEnv("DB_HOST", "localhost")
@@ -94,13 +100,15 @@ func main() {
 	// Injeção de dependências (DI)
 	// Inicializa EventBus (Pub/Sub)
 	gcpProjectID := getEnv("GCP_PROJECT_ID", "")
+	appEnv := getEnv("APP_ENV", "dev")
+
 	if gcpProjectID == "" {
 		slog.Error("GCP_PROJECT_ID não configurado")
 		os.Exit(1)
 	}
 
 	ctx := context.Background()
-	bus, err := pubsub.NovoGCPEventBus(ctx, gcpProjectID)
+	bus, err := pubsub.NovoGCPEventBus(ctx, gcpProjectID, appEnv)
 	if err != nil {
 		slog.Error("Erro ao inicializar GCP Pub/Sub", "erro", err)
 		os.Exit(1)
@@ -111,6 +119,20 @@ func main() {
 	repo := repositorio.NovoRepositorioPostgres(db)
 	servico := casodeuso.NovoServicoRecomendacao(repo, bus)
 	handler := controladores.NovoControladorRecomendacoes(servico)
+
+	// Inicializa Firebase Auth
+	firebaseCredentials := getEnv("FIREBASE_CREDENTIALS_PATH", "")
+	authMiddleware, err := middleware.NovoFirebaseAuth(ctx, firebaseCredentials)
+	if err != nil {
+		slog.Error("Erro ao inicializar Firebase Auth", "erro", err)
+		os.Exit(1)
+	}
+
+	authController, err := controladores.NovoControladorAuth(ctx, firebaseCredentials)
+	if err != nil {
+		slog.Error("Erro ao inicializar controlador de autenticação", "erro", err)
+		os.Exit(1)
+	}
 
 	// Inicializa Worker de Recomendação
 	workerRecom := worker.NovoWorkerRecomendacao(servico, bus)
@@ -127,11 +149,24 @@ func main() {
 	// Grupo de API nova de microsserviços
 	v2 := router.Group("/api/v2")
 
-	// Rotas
+	// Rotas públicas (sem autenticação)
 	v2.GET("/healthcheck", handler.HealthCheck)
-	v2.GET("/recomendacoes/:clienteId", handler.BuscarRecomendacoes)
-	v2.POST("/recomendacoes/:clienteId", handler.GerarRecomendacoes)
-	v2.POST("/recomendacoes", handler.GerarRecomendacoesMassiva)
+
+	// Rotas de autenticação (públicas)
+	authGroup := v2.Group("/auth")
+	{
+		authGroup.POST("/login", authController.GerarToken)
+		authGroup.GET("/verify", authMiddleware.Middleware(), authController.VerificarToken)
+	}
+
+	// Rotas protegidas (requerem autenticação)
+	protected := v2.Group("")
+	protected.Use(authMiddleware.Middleware())
+	{
+		protected.GET("/recomendacoes/:clienteId", handler.BuscarRecomendacoes)
+		protected.POST("/recomendacoes/:clienteId", handler.GerarRecomendacoes)
+		protected.POST("/recomendacoes", handler.GerarRecomendacoesMassiva)
+	}
 
 	// Swagger
 	v2.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

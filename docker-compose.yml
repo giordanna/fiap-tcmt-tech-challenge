@@ -27,12 +27,17 @@ services:
       dockerfile: Dockerfile
     container_name: tech-challenge-backend
     environment:
+      APP_ENV: dev
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: fiap
       DB_PASSWORD: fiap123
       DB_NAME: tech_challenge
       API_PORT: 8080
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+      FIREBASE_CREDENTIALS_PATH: /app/firebase-credentials.json
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
     ports:
       - "8080:8080"
     depends_on:
@@ -40,7 +45,9 @@ services:
         condition: service_healthy
     networks:
       - tech-challenge-network
-    restart: unless-stopped
+    volumes:
+      - ./gcp-credentials.json:/app/gcp-credentials.json
+      - ./firebase-credentials.json:/app/firebase-credentials.json
 
 volumes:
   postgres_data:

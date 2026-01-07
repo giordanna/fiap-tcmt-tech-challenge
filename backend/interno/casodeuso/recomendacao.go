@@ -147,6 +147,11 @@ func (s *ServicoRecomendacao) BuscarUltima(clienteID string) (*dominio.Resultado
 	return s.repo.BuscarUltimaRecomendacao(clienteID)
 }
 
+// SolicitarGeracao publica uma mensagem no tópico para gerar recomendação de forma assíncrona
+func (s *ServicoRecomendacao) SolicitarGeracao(clienteID string) {
+	s.publicador.Publicar("gerar-recomendacao", clienteID)
+}
+
 // GerarEmMassa dispara o processo de recomendação para todos os clientes de forma assíncrona
 func (s *ServicoRecomendacao) GerarEmMassa() error {
 	clientes, err := s.repo.ListarTodosClientes()
@@ -159,8 +164,7 @@ func (s *ServicoRecomendacao) GerarEmMassa() error {
 
 	for _, cliente := range clientes {
 		// Publica evento para cada cliente
-		// O tópico deve coincidir com o que o worker escuta: "gerar-recomendacao"
-		s.publicador.Publicar("gerar-recomendacao", cliente.ID)
+		s.SolicitarGeracao(cliente.ID)
 	}
 
 	return nil

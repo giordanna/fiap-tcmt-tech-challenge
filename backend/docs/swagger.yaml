@@ -1,5 +1,36 @@
 basePath: /
 definitions:
+  controladores.LoginRequest:
+    properties:
+      email:
+        example: usuario@exemplo.com
+        type: string
+      password:
+        example: senha123
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  controladores.LoginResponse:
+    properties:
+      email:
+        example: usuario@exemplo.com
+        type: string
+      expiresIn:
+        example: "3600"
+        type: string
+      idToken:
+        example: eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMzQ1Njc4OTAifQ...
+        type: string
+      refreshToken:
+        example: '...'
+        type: string
+      uid:
+        example: abc123def456
+        type: string
+    type: object
   dominio.Produto:
     properties:
       aplicacao_minima:
@@ -41,6 +72,68 @@ info:
   title: API de Recomendações
   version: 1.0.0
 paths:
+  /api/v2/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Gera um ID token JWT do Firebase para um usuário específico
+      parameters:
+      - description: Credenciais de login
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controladores.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token gerado com sucesso
+          schema:
+            $ref: '#/definitions/controladores.LoginResponse'
+        "400":
+          description: Requisição inválida
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Credenciais inválidas
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Erro interno do servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Gerar token de autenticação
+      tags:
+      - Autenticação
+  /api/v2/auth/verify:
+    get:
+      description: Verifica se o token JWT fornecido é válido
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token válido
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Token inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Verificar token
+      tags:
+      - Autenticação
   /api/v2/healthcheck:
     get:
       description: Retorna status OK se a API estiver no ar
@@ -71,12 +164,20 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: Internal Server Error
           schema:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Gera recomendações em massa
       tags:
       - recomendacoes
@@ -98,19 +199,28 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dominio.ResultadoRecomendacao'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "404":
           description: Not Found
           schema:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Busca recomendações recentes
       tags:
       - recomendacoes
     post:
       consumes:
       - application/json
-      description: Gera e persiste novas recomendações para o cliente informado
+      description: Publica uma mensagem para gerar recomendações em background para
+        o cliente informado
       parameters:
       - description: ID do Cliente
         in: path
@@ -120,20 +230,33 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "202":
+          description: Accepted
           schema:
-            $ref: '#/definitions/dominio.ResultadoRecomendacao'
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: Internal Server Error
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Gera novas recomendações
+      security:
+      - BearerAuth: []
+      summary: Solicita geração de recomendação
       tags:
       - recomendacoes
 securityDefinitions:
-  BasicAuth:
-    type: basic
+  BearerAuth:
+    description: 'Token JWT do Firebase Auth. Formato: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

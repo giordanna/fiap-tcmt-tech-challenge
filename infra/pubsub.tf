@@ -3,7 +3,7 @@
 
 # Tópico para geração de recomendações individuais
 resource "google_pubsub_topic" "gerar_recomendacao" {
-  name    = "gerar-recomendacao"
+  name    = "gerar-recomendacao${local.env_suffix}"
   project = var.gcp_project_id
 
   message_retention_duration = "86400s" # 24 horas
@@ -16,7 +16,7 @@ resource "google_pubsub_topic" "gerar_recomendacao" {
 
 # Subscription para o worker de recomendações
 resource "google_pubsub_subscription" "gerar_recomendacao_sub" {
-  name    = "gerar-recomendacao-sub"
+  name    = "gerar-recomendacao-sub${local.env_suffix}"
   topic   = google_pubsub_topic.gerar_recomendacao.name
   project = var.gcp_project_id
 
@@ -29,10 +29,13 @@ resource "google_pubsub_subscription" "gerar_recomendacao_sub" {
     maximum_backoff = "600s"
   }
 
-  # Dead Letter Queue (opcional, mas recomendado)
-  dead_letter_policy {
-    dead_letter_topic     = google_pubsub_topic.dlq.id
-    max_delivery_attempts = 5
+  # Dead Letter Queue (apenas para produção)
+  dynamic "dead_letter_policy" {
+    for_each = var.environment == "prod" ? [1] : []
+    content {
+      dead_letter_topic     = google_pubsub_topic.dlq[0].id
+      max_delivery_attempts = 5
+    }
   }
 
   # Filtro de mensagens (opcional)
@@ -49,9 +52,10 @@ resource "google_pubsub_subscription" "gerar_recomendacao_sub" {
   }
 }
 
-# Dead Letter Queue (DLQ) para mensagens com falha
+# Dead Letter Queue (DLQ) para mensagens com falha - APENAS PRODUÇÃO
 resource "google_pubsub_topic" "dlq" {
-  name    = "recomendacoes-dlq"
+  count   = var.environment == "prod" ? 1 : 0
+  name    = "recomendacoes-dlq${local.env_suffix}"
   project = var.gcp_project_id
 
   message_retention_duration = "604800s" # 7 dias
@@ -63,10 +67,11 @@ resource "google_pubsub_topic" "dlq" {
   }
 }
 
-# Subscription para monitorar a DLQ
+# Subscription para monitorar a DLQ - APENAS PRODUÇÃO
 resource "google_pubsub_subscription" "dlq_sub" {
-  name    = "recomendacoes-dlq-sub"
-  topic   = google_pubsub_topic.dlq.name
+  count   = var.environment == "prod" ? 1 : 0
+  name    = "recomendacoes-dlq-sub${local.env_suffix}"
+  topic   = google_pubsub_topic.dlq[0].name
   project = var.gcp_project_id
 
   # Mantém mensagens por mais tempo para análise
@@ -95,16 +100,18 @@ resource "google_pubsub_subscription_iam_member" "cloud_run_subscriber" {
   member       = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
-# Alerta para mensagens na DLQ
+# Alerta para mensagens na DLQ - APENAS PRODUÇÃO
 resource "google_monitoring_alert_policy" "dlq_messages" {
-  display_name = "Pub/Sub - Mensagens na DLQ"
+  count        = var.environment == "prod" ? 1 : 0
+  display_name = "Pub/Sub - Mensagens na DLQ (${var.environment})"
   project      = var.gcp_project_id
+  combiner     = "OR"
 
   conditions {
     display_name = "Mensagens não processadas na DLQ"
 
     condition_threshold {
-      filter          = "resource.type = \"pubsub_subscription\" AND resource.labels.subscription_id = \"${google_pubsub_subscription.dlq_sub.name}\" AND metric.type = \"pubsub.googleapis.com/subscription/num_undelivered_messages\""
+      filter          = "resource.type = \"pubsub_subscription\" AND resource.labels.subscription_id = \"${google_pubsub_subscription.dlq_sub[0].name}\" AND metric.type = \"pubsub.googleapis.com/subscription/num_undelivered_messages\""
       duration        = "300s"
       comparison      = "COMPARISON_GT"
       threshold_value = 10
@@ -123,10 +130,12 @@ resource "google_monitoring_alert_policy" "dlq_messages" {
   }
 }
 
-# Alerta para mensagens antigas não processadas
+# Alerta para mensagens antigas não processadas - APENAS PRODUÇÃO
 resource "google_monitoring_alert_policy" "old_messages" {
-  display_name = "Pub/Sub - Mensagens antigas não processadas"
+  count        = var.environment == "prod" ? 1 : 0
+  display_name = "Pub/Sub - Mensagens antigas não processadas (${var.environment})"
   project      = var.gcp_project_id
+  combiner     = "OR"
 
   conditions {
     display_name = "Mensagens com mais de 1 hora na fila"
@@ -163,6 +172,6 @@ output "pubsub_subscription_name" {
 }
 
 output "pubsub_dlq_topic_name" {
-  description = "Nome do tópico DLQ"
-  value       = google_pubsub_topic.dlq.name
+  description = "Nome do tópico DLQ (apenas prod)"
+  value       = var.environment == "prod" ? google_pubsub_topic.dlq[0].name : "N/A (DLQ apenas em produção)"
 }

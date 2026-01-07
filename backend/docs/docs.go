@@ -15,6 +15,102 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v2/auth/login": {
+            "post": {
+                "description": "Gera um ID token JWT do Firebase para um usuário específico",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Autenticação"
+                ],
+                "summary": "Gerar token de autenticação",
+                "parameters": [
+                    {
+                        "description": "Credenciais de login",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controladores.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Token gerado com sucesso",
+                        "schema": {
+                            "$ref": "#/definitions/controladores.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Requisição inválida",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Credenciais inválidas",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno do servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/auth/verify": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Verifica se o token JWT fornecido é válido",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Autenticação"
+                ],
+                "summary": "Verificar token",
+                "responses": {
+                    "200": {
+                        "description": "Token válido",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Token inválido",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v2/healthcheck": {
             "get": {
                 "description": "Retorna status OK se a API estiver no ar",
@@ -40,6 +136,11 @@ const docTemplate = `{
         },
         "/api/v2/recomendacoes": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Dispara processo assíncrono para gerar recomendações para todos os clientes",
                 "consumes": [
                     "application/json"
@@ -61,6 +162,15 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -75,6 +185,11 @@ const docTemplate = `{
         },
         "/api/v2/recomendacoes/{clienteId}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Retorna as últimas recomendações geradas para o cliente",
                 "consumes": [
                     "application/json"
@@ -102,6 +217,15 @@ const docTemplate = `{
                             "$ref": "#/definitions/dominio.ResultadoRecomendacao"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -114,7 +238,12 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Gera e persiste novas recomendações para o cliente informado",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Publica uma mensagem para gerar recomendações em background para o cliente informado",
                 "consumes": [
                     "application/json"
                 ],
@@ -124,7 +253,7 @@ const docTemplate = `{
                 "tags": [
                     "recomendacoes"
                 ],
-                "summary": "Gera novas recomendações",
+                "summary": "Solicita geração de recomendação",
                 "parameters": [
                     {
                         "type": "string",
@@ -135,10 +264,22 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/dominio.ResultadoRecomendacao"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "500": {
@@ -155,6 +296,49 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "controladores.LoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "usuario@exemplo.com"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "example": "senha123"
+                }
+            }
+        },
+        "controladores.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "usuario@exemplo.com"
+                },
+                "expiresIn": {
+                    "type": "string",
+                    "example": "3600"
+                },
+                "idToken": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMzQ1Njc4OTAifQ..."
+                },
+                "refreshToken": {
+                    "type": "string",
+                    "example": "..."
+                },
+                "uid": {
+                    "type": "string",
+                    "example": "abc123def456"
+                }
+            }
+        },
         "dominio.Produto": {
             "type": "object",
             "properties": {
@@ -209,8 +393,11 @@ const docTemplate = `{
         }
     },
     "securityDefinitions": {
-        "BasicAuth": {
-            "type": "basic"
+        "BearerAuth": {
+            "description": "Token JWT do Firebase Auth. Formato: Bearer {token}",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`
