@@ -264,3 +264,76 @@ resource "google_cloud_run_service" "backend" {
 output "url_api" {
   value = google_cloud_run_service.backend.status[0].url
 }
+
+# Permissões do IAM para a Service Account do Cloud Run
+
+# 1. Permissão para conectar ao Cloud SQL (CRÍTICO para startup)
+resource "google_project_iam_member" "cloudrun_sql_client" {
+  project = var.gcp_project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+}
+
+# 2. Permissões para Pub/Sub (Publisher e Subscriber) - Nível de projeto para garantir acesso
+resource "google_project_iam_member" "cloudrun_pubsub_publisher" {
+  project = var.gcp_project_id
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+}
+
+resource "google_project_iam_member" "cloudrun_pubsub_subscriber" {
+  project = var.gcp_project_id
+  role    = "roles/pubsub.subscriber"
+  member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+}
+
+# 3. Permissões para Firebase Auth (para GetUserByEmail e verificação)
+resource "google_project_iam_member" "cloudrun_firebase_admin" {
+  project = var.gcp_project_id
+  role    = "roles/firebaseauth.admin"
+  member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+}
+
+# 4. Permissão para assinar tokens (Custom Tokens)
+resource "google_project_iam_member" "cloudrun_token_creator" {
+  project = var.gcp_project_id
+  role    = "roles/iam.serviceAccountTokenCreator"
+  member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+}
+
+# Service Account para GitHub Actions (Deploy)
+resource "google_service_account" "github_actions_sa" {
+  account_id   = "github-actions-deploy"
+  display_name = "GitHub Actions Deploy Service Account"
+}
+
+# Permissões do GitHub Actions
+
+# 1. Permissão para subir imagens no Artifact Registry
+resource "google_artifact_registry_repository_iam_member" "github_actions_ar_writer" {
+  project    = var.gcp_project_id
+  location   = google_artifact_registry_repository.app_repo.location
+  repository = google_artifact_registry_repository.app_repo.name
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${google_service_account.github_actions_sa.email}"
+}
+
+# 2. Permissão para gerenciar o Cloud Run (fazer o deploy)
+resource "google_project_iam_member" "github_actions_run_admin" {
+  project = var.gcp_project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_service_account.github_actions_sa.email}"
+}
+
+# 3. Permissão para "agir como" a service account de runtime (cloudrun-sa)
+# Isso permite que o GitHub Actions faça deploy de um serviço que RODA como cloudrun-sa
+resource "google_service_account_iam_member" "github_actions_act_as_runtime" {
+  service_account_id = google_service_account.cloudrun_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions_sa.email}"
+}
+
+output "github_actions_sa_email" {
+  description = "Email da Service Account para configurar no GitHub Secrets"
+  value       = google_service_account.github_actions_sa.email
+}
