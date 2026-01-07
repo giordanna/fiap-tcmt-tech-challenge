@@ -12,7 +12,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o api-gateway ./main.go
 
 # estágio final (imagem leve)
-FROM alpine:latest
+FROM alpine:3.19
 
 # Instala certificados e timezone
 RUN apk --no-cache add ca-certificates tzdata
