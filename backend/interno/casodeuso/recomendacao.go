@@ -80,14 +80,18 @@ func (s *ServicoRecomendacao) Executar(clienteID string) (*dominio.ResultadoReco
 			}
 
 			// 4. regra de diversificacao (penaliza se ja tem)
-			jaTem, _ := s.repo.VerificarPosseProduto(cliente.ID, prod.ID)
-			if jaTem {
+			jaTem, err := s.repo.VerificarPosseProduto(cliente.ID, prod.ID)
+			if err != nil {
+				slog.Error("falha ao verificar posse de produto", "err", err, "clienteID", cliente.ID, "produtoID", prod.ID)
+			} else if jaTem {
 				score -= 0.2
 			}
 
 			// 5. regra de interesse (se interagiu recentemente)
-			interagiu, _ := s.repo.VerificarInteracaoRecente(cliente.ID, prod.ID)
-			if interagiu {
+			interagiu, err := s.repo.VerificarInteracaoRecente(cliente.ID, prod.ID)
+			if err != nil {
+				slog.Error("falha ao verificar interacao recente", "err", err, "clienteID", cliente.ID, "produtoID", prod.ID)
+			} else if interagiu {
 				score += 0.15
 				motivo += "[interesse recente] "
 			}
