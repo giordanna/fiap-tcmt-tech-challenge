@@ -6,7 +6,7 @@ toolchain go1.24.4
 
 require (
 	cloud.google.com/go/pubsub v1.50.1
-	firebase.google.com/go/v4 v4.18.0
+	firebase.google.com/go/v4 v4.19.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
